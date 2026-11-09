@@ -34,6 +34,7 @@ import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
 import ru.b1sted.altshift.model.ThemeMode;
 import ru.b1sted.altshift.service.InputMethodSwitcher;
+import ru.b1sted.altshift.service.KeyboardNotification;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
 import ru.b1sted.altshift.service.KeyboardSwitchService;
 import ru.b1sted.altshift.storage.HotkeyRepository;
@@ -318,7 +319,10 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void updateAutoSwitchService(boolean enabled, boolean permission) {
-        if (enabled && permission) {
+        boolean canPrompt = Settings.canDrawOverlays(this)
+                || KeyboardNotification.canPost(this);
+
+        if (enabled && (permission || canPrompt)) {
             KeyboardSwitchService.start(this);
 
             return;

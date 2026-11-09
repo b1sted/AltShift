@@ -46,6 +46,13 @@
             android:exported="false"
             android:theme="@style/Theme.AltShift" />
 
+        <activity
+            android:name=".ui.SwitchBackActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.AltShift.Transparent" />
+
         <service
             android:name=".service.HardwareInputService"
             android:exported="true"

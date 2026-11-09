@@ -1,5 +1,6 @@
 package ru.b1sted.altshift.service;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.hardware.input.InputManager;
@@ -23,6 +24,7 @@ import ru.b1sted.altshift.databinding.ViewImeFallbackBinding;
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
 import ru.b1sted.altshift.storage.HotkeyRepository;
+import ru.b1sted.altshift.ui.SwitchBackActivity;
 
 public final class HardwareInputService extends InputMethodService {
 
@@ -230,11 +232,13 @@ public final class HardwareInputService extends InputMethodService {
             }
 
             if (!isActiveInputMethod()) {
-                KeyboardNotification.showReconnected(this);
+                showReconnectPrompt();
             }
 
             return;
         }
+
+        KeyboardPromptOverlay.dismiss();
 
         if (!alternativeImeAvailable) {
             return;
@@ -245,6 +249,19 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         switchToSoftKeyboard(false);
+    }
+
+    private void showReconnectPrompt() {
+        KeyboardNotification.cancel(this);
+
+        Context appContext = getApplicationContext();
+        boolean shown = KeyboardPromptOverlay.show(
+                appContext, () -> SwitchBackActivity.start(appContext));
+        if (shown) {
+            return;
+        }
+
+        KeyboardNotification.showReconnected(appContext);
     }
 
     private boolean isAutoSwitchEnabled() {
