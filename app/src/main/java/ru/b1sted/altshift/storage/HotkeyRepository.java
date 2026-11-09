@@ -22,6 +22,8 @@ public final class HotkeyRepository {
     private static final String KEY_HOTKEYS = "hotkeys";
     private static final String KEY_LANGUAGE_SHORTCUT = "language_shortcut";
     private static final String KEY_ONBOARDING_COMPLETED = "onboarding_completed";
+    private static final String KEY_AUTO_SWITCH_ENABLED = "auto_switch_enabled";
+    private static final String KEY_PREVIOUS_INPUT_METHOD = "previous_input_method";
     private static final HotkeyBinding[] EMPTY_BINDINGS = new HotkeyBinding[0];
 
     private static volatile HotkeyRepository instance;
@@ -32,6 +34,8 @@ public final class HotkeyRepository {
     private volatile HotkeyBinding[] bindings;
     private volatile LanguageSwitchShortcut languageShortcut;
     private volatile boolean onboardingCompleted;
+    private volatile boolean autoSwitchEnabled;
+    private volatile String previousInputMethod;
 
     private HotkeyRepository(Context context) {
         preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -40,6 +44,8 @@ public final class HotkeyRepository {
         languageShortcut = readLanguageShortcut(
                 preferences.getString(KEY_LANGUAGE_SHORTCUT, null));
         onboardingCompleted = preferences.getBoolean(KEY_ONBOARDING_COMPLETED, false);
+        autoSwitchEnabled = preferences.getBoolean(KEY_AUTO_SWITCH_ENABLED, true);
+        previousInputMethod = preferences.getString(KEY_PREVIOUS_INPUT_METHOD, null);
     }
 
     public static HotkeyRepository getInstance(Context context) {
@@ -80,6 +86,37 @@ public final class HotkeyRepository {
                     .putBoolean(KEY_ONBOARDING_COMPLETED, completed)
                     .apply();
             onboardingCompleted = completed;
+        }
+    }
+
+    public boolean isAutoSwitchEnabled() {
+        return autoSwitchEnabled;
+    }
+
+    public void saveAutoSwitchEnabled(boolean enabled) {
+        synchronized (lock) {
+            preferences.edit()
+                    .putBoolean(KEY_AUTO_SWITCH_ENABLED, enabled)
+                    .apply();
+            autoSwitchEnabled = enabled;
+        }
+    }
+
+    public String getPreviousInputMethod() {
+        return previousInputMethod;
+    }
+
+    public void savePreviousInputMethod(String imeId) {
+        synchronized (lock) {
+            SharedPreferences.Editor editor = preferences.edit();
+            if (imeId == null || imeId.isEmpty()) {
+                editor.remove(KEY_PREVIOUS_INPUT_METHOD);
+            } else {
+                editor.putString(KEY_PREVIOUS_INPUT_METHOD, imeId);
+            }
+
+            editor.apply();
+            previousInputMethod = imeId;
         }
     }
 

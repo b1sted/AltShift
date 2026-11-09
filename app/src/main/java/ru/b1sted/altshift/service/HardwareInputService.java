@@ -1,12 +1,10 @@
 package ru.b1sted.altshift.service;
 
-import android.content.ComponentName;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.hardware.input.InputManager;
 import android.inputmethodservice.InputMethodService;
 import android.os.Build;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -159,7 +157,13 @@ public final class HardwareInputService extends InputMethodService {
     }
 
     private void updateKeyboardState(boolean present) {
+        boolean autoSwitch = isAutoSwitchEnabled();
+
         if (present) {
+            if (autoSwitch && InputMethodSwitcher.switchToAltShift(this)) {
+                return;
+            }
+
             if (!isActiveInputMethod()) {
                 KeyboardNotification.showReconnected(this);
             }
@@ -167,7 +171,21 @@ public final class HardwareInputService extends InputMethodService {
             return;
         }
 
+        if (autoSwitch && InputMethodSwitcher.switchToSoftKeyboard(this)) {
+            return;
+        }
+
         switchToSoftKeyboard(false);
+    }
+
+    private boolean isAutoSwitchEnabled() {
+        HotkeyRepository local = repository;
+        if (local == null) {
+            return false;
+        }
+
+        return local.isAutoSwitchEnabled()
+                && InputMethodSwitcher.hasSecureSettingsPermission(this);
     }
 
     private void switchToSoftKeyboard(boolean showPickerOnFailure) {
@@ -206,22 +224,7 @@ public final class HardwareInputService extends InputMethodService {
     }
 
     private boolean isActiveInputMethod() {
-        try {
-            String active = Settings.Secure.getString(
-                    getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
-            if (active == null) {
-                return false;
-            }
-
-            ComponentName component = new ComponentName(this, HardwareInputService.class);
-
-            return active.contains(component.flattenToString())
-                    || active.contains(component.flattenToShortString());
-        } catch (RuntimeException exception) {
-            Log.w(TAG, "Unable to read the active input method", exception);
-
-            return false;
-        }
+        return InputMethodSwitcher.isAltShiftActive(this);
     }
 
     private void registerDeviceListener() {

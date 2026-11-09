@@ -1,11 +1,10 @@
 package ru.b1sted.altshift.ui;
 
-import android.content.ComponentName;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
-import android.provider.Settings;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -21,8 +20,9 @@ import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ActivityMainBinding;
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
-import ru.b1sted.altshift.service.HardwareInputService;
+import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
+import ru.b1sted.altshift.service.KeyboardSwitchService;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 
 public final class MainActivity extends AppCompatActivity {
@@ -36,6 +36,7 @@ public final class MainActivity extends AppCompatActivity {
     private HotkeyRepository repository;
     private HotkeyAdapter adapter;
     private boolean openPickerOnResume;
+    private boolean autoSwitchHintExpanded;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -60,6 +61,12 @@ public final class MainActivity extends AppCompatActivity {
         binding.languageShortcutButton.setOnClickListener(
                 view -> captureLanguageShortcut());
         binding.addHotkeyFab.setOnClickListener(view -> addHotkey());
+        binding.autoSwitchToggle.setOnCheckedChangeListener(
+                (button, checked) -> onAutoSwitchToggled(checked));
+        binding.autoSwitchHintToggle.setOnClickListener(
+                view -> toggleAutoSwitchHint());
+        binding.copyCommandButton.setOnClickListener(
+                view -> copyAutoSwitchCommand());
 
         openPickerOnResume = getIntent().getBooleanExtra(
                 EXTRA_OPEN_IME_PICKER, false);
@@ -111,6 +118,7 @@ public final class MainActivity extends AppCompatActivity {
 
     private void refreshAll() {
         refreshStatus();
+        refreshAutoSwitch();
         refreshLanguageShortcut();
         refreshHotkeys();
     }
@@ -118,7 +126,7 @@ public final class MainActivity extends AppCompatActivity {
     private void refreshStatus() {
         boolean keyboardPresent = KeyboardPresenceMonitor
                 .isPhysicalKeyboardAvailable(this);
-        boolean imeActive = isAltShiftActive();
+        boolean imeActive = InputMethodSwitcher.isAltShiftActive(this);
 
         String keyboardStatus = getString(keyboardPresent
                 ? R.string.status_keyboard_connected
@@ -135,23 +143,84 @@ public final class MainActivity extends AppCompatActivity {
         binding.statusDot.setBackgroundTintList(ColorStateList.valueOf(dotColor));
     }
 
-    private boolean isAltShiftActive() {
-        try {
-            String active = Settings.Secure.getString(
-                    getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
-            if (TextUtils.isEmpty(active)) {
-                return false;
-            }
+    private void refreshAutoSwitch() {
+        boolean enabled = repository.isAutoSwitchEnabled();
+        boolean permission = InputMethodSwitcher.hasSecureSettingsPermission(this);
 
-            ComponentName component = new ComponentName(this, HardwareInputService.class);
+        binding.autoSwitchToggle.setOnCheckedChangeListener(null);
+        binding.autoSwitchToggle.setChecked(enabled);
+        binding.autoSwitchToggle.setOnCheckedChangeListener(
+                (button, checked) -> onAutoSwitchToggled(checked));
 
-            return active.contains(component.flattenToString())
-                    || active.contains(component.flattenToShortString());
-        } catch (RuntimeException exception) {
-            Log.w(TAG, "Unable to read the active input method", exception);
+        int statusResId;
+        int statusColorResId;
 
-            return false;
+        if (!enabled) {
+            statusResId = R.string.auto_switch_status_off;
+            statusColorResId = R.color.brand_on_surface_variant;
+        } else if (permission) {
+            statusResId = R.string.auto_switch_status_active;
+            statusColorResId = R.color.brand_success;
+        } else {
+            statusResId = R.string.auto_switch_status_permission;
+            statusColorResId = R.color.brand_error;
         }
+
+        binding.autoSwitchStatus.setText(statusResId);
+        binding.autoSwitchStatus.setTextColor(getColor(statusColorResId));
+
+        if (permission) {
+            autoSwitchHintExpanded = false;
+        }
+
+        binding.autoSwitchHintToggle.setVisibility(permission ? View.GONE : View.VISIBLE);
+        binding.autoSwitchHintToggle.setText(autoSwitchHintExpanded
+                ? R.string.auto_switch_hint_hide
+                : R.string.auto_switch_hint_show);
+        binding.autoSwitchHint.setVisibility(
+                !permission && autoSwitchHintExpanded ? View.VISIBLE : View.GONE);
+
+        updateAutoSwitchService(enabled, permission);
+    }
+
+    private void onAutoSwitchToggled(boolean enabled) {
+        repository.saveAutoSwitchEnabled(enabled);
+
+        if (enabled && !InputMethodSwitcher.hasSecureSettingsPermission(this)) {
+            autoSwitchHintExpanded = true;
+            toast(R.string.auto_switch_permission_required);
+        }
+
+        refreshAutoSwitch();
+    }
+
+    private void toggleAutoSwitchHint() {
+        autoSwitchHintExpanded = !autoSwitchHintExpanded;
+        refreshAutoSwitch();
+    }
+
+    private void copyAutoSwitchCommand() {
+        ClipboardManager clipboard =
+                (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            return;
+        }
+
+        ClipData clip = ClipData.newPlainText(
+                getString(R.string.auto_switch_command_label),
+                getString(R.string.auto_switch_command));
+        clipboard.setPrimaryClip(clip);
+        toast(R.string.command_copied);
+    }
+
+    private void updateAutoSwitchService(boolean enabled, boolean permission) {
+        if (enabled && permission) {
+            KeyboardSwitchService.start(this);
+
+            return;
+        }
+
+        KeyboardSwitchService.stop(this);
     }
 
     private void refreshLanguageShortcut() {
