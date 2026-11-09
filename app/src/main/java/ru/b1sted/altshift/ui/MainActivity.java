@@ -14,12 +14,15 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 import java.util.Objects;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ActivityMainBinding;
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
+import ru.b1sted.altshift.model.ThemeMode;
 import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
 import ru.b1sted.altshift.service.KeyboardSwitchService;
@@ -67,6 +70,7 @@ public final class MainActivity extends AppCompatActivity {
                 view -> toggleAutoSwitchHint());
         binding.copyCommandButton.setOnClickListener(
                 view -> copyAutoSwitchCommand());
+        binding.themeButton.setOnClickListener(view -> showThemeDialog());
 
         openPickerOnResume = getIntent().getBooleanExtra(
                 EXTRA_OPEN_IME_PICKER, false);
@@ -221,6 +225,36 @@ public final class MainActivity extends AppCompatActivity {
         }
 
         KeyboardSwitchService.stop(this);
+    }
+
+    private void showThemeDialog() {
+        ThemeMode[] modes = ThemeMode.values();
+        String[] labels = new String[modes.length];
+
+        for (int index = 0; index < modes.length; index++) {
+            labels[index] = getString(themeLabelRes(modes[index]));
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.theme_title)
+                .setSingleChoiceItems(
+                        labels,
+                        repository.getThemeMode().ordinal(),
+                        (dialog, which) -> {
+                            ThemeController.saveAndApply(this, modes[which]);
+                            dialog.dismiss();
+                        })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private int themeLabelRes(ThemeMode mode) {
+        return switch (mode) {
+            case LIGHT -> R.string.theme_light;
+            case DARK -> R.string.theme_dark;
+            case FOLLOW_SYSTEM -> R.string.theme_system;
+            default -> R.string.theme_system;
+        };
     }
 
     private void refreshLanguageShortcut() {

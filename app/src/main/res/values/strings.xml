@@ -37,6 +37,11 @@
     <string name="status_ime_active">AltShift active</string>
     <string name="status_ime_inactive">AltShift inactive</string>
 
+    <string name="theme_title">Theme</string>
+    <string name="theme_system">System default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
     <string name="auto_switch_title">Seamless auto-switching</string>
     <string name="auto_switch_description">Switch between AltShift and your soft keyboard automatically when a hardware keyboard is attached or removed.</string>
     <string name="auto_switch_status_active">Active</string>
