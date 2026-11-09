@@ -8,67 +8,62 @@ public final class KeyMatcher {
     }
 
     public static boolean matches(
-            final int bindingKeyCode,
-            final boolean bindingCtrl,
-            final boolean bindingAlt,
-            final boolean bindingShift,
-            final boolean bindingMeta,
-            final int eventKeyCode,
-            final boolean eventCtrl,
-            final boolean eventAlt,
-            final boolean eventShift,
-            final boolean eventMeta) {
+            int bindingKeyCode,
+            boolean bindingCtrl,
+            boolean bindingAlt,
+            boolean bindingShift,
+            boolean bindingMeta,
+            int eventKeyCode,
+            boolean eventCtrl,
+            boolean eventAlt,
+            boolean eventShift,
+            boolean eventMeta) {
         if (bindingCtrl != eventCtrl
                 || bindingAlt != eventAlt
                 || bindingShift != eventShift
                 || bindingMeta != eventMeta) {
             return false;
         }
+
         if (bindingKeyCode == eventKeyCode) {
             return true;
         }
+
         return isModifierKey(bindingKeyCode)
                 && isModifierKey(eventKeyCode)
                 && isModifierActive(eventKeyCode, eventCtrl, eventAlt, eventShift, eventMeta);
     }
 
-    public static boolean isModifierKey(final int keyCode) {
-        switch (keyCode) {
-            case KeyEvent.KEYCODE_SHIFT_LEFT:
-            case KeyEvent.KEYCODE_SHIFT_RIGHT:
-            case KeyEvent.KEYCODE_ALT_LEFT:
-            case KeyEvent.KEYCODE_ALT_RIGHT:
-            case KeyEvent.KEYCODE_CTRL_LEFT:
-            case KeyEvent.KEYCODE_CTRL_RIGHT:
-            case KeyEvent.KEYCODE_META_LEFT:
-            case KeyEvent.KEYCODE_META_RIGHT:
-                return true;
-            default:
-                return false;
-        }
+    public static boolean isModifierKey(int keyCode) {
+        return switch (keyCode) {
+            case KeyEvent.KEYCODE_SHIFT_LEFT,
+                 KeyEvent.KEYCODE_SHIFT_RIGHT,
+                 KeyEvent.KEYCODE_ALT_LEFT,
+                 KeyEvent.KEYCODE_ALT_RIGHT,
+                 KeyEvent.KEYCODE_CTRL_LEFT,
+                 KeyEvent.KEYCODE_CTRL_RIGHT,
+                 KeyEvent.KEYCODE_META_LEFT,
+                 KeyEvent.KEYCODE_META_RIGHT -> true;
+            default -> false;
+        };
     }
 
     public static boolean isModifierActive(
-            final int keyCode,
-            final boolean ctrl,
-            final boolean alt,
-            final boolean shift,
-            final boolean meta) {
-        switch (keyCode) {
-            case KeyEvent.KEYCODE_SHIFT_LEFT:
-            case KeyEvent.KEYCODE_SHIFT_RIGHT:
-                return shift;
-            case KeyEvent.KEYCODE_ALT_LEFT:
-            case KeyEvent.KEYCODE_ALT_RIGHT:
-                return alt;
-            case KeyEvent.KEYCODE_CTRL_LEFT:
-            case KeyEvent.KEYCODE_CTRL_RIGHT:
-                return ctrl;
-            case KeyEvent.KEYCODE_META_LEFT:
-            case KeyEvent.KEYCODE_META_RIGHT:
-                return meta;
-            default:
-                return false;
-        }
+            int keyCode,
+            boolean ctrl,
+            boolean alt,
+            boolean shift,
+            boolean meta) {
+        return switch (keyCode) {
+            case KeyEvent.KEYCODE_SHIFT_LEFT,
+                 KeyEvent.KEYCODE_SHIFT_RIGHT -> shift;
+            case KeyEvent.KEYCODE_ALT_LEFT,
+                 KeyEvent.KEYCODE_ALT_RIGHT -> alt;
+            case KeyEvent.KEYCODE_CTRL_LEFT,
+                 KeyEvent.KEYCODE_CTRL_RIGHT -> ctrl;
+            case KeyEvent.KEYCODE_META_LEFT,
+                 KeyEvent.KEYCODE_META_RIGHT -> meta;
+            default -> false;
+        };
     }
 }

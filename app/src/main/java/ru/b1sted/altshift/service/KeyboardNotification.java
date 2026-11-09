@@ -24,29 +24,32 @@ public final class KeyboardNotification {
     private KeyboardNotification() {
     }
 
-    public static void showReconnected(final Context context) {
+    public static void showReconnected(Context context) {
         if (context == null) {
             return;
         }
+
         try {
-            final NotificationManager manager =
+            NotificationManager manager =
                     (NotificationManager) context.getSystemService(
                             Context.NOTIFICATION_SERVICE);
             if (manager == null) {
                 return;
             }
+
             ensureChannel(context, manager);
 
-            final Intent intent = new Intent(context, MainActivity.class);
+            Intent intent = new Intent(context, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             intent.putExtra(MainActivity.EXTRA_OPEN_IME_PICKER, true);
-            final PendingIntent pendingIntent = PendingIntent.getActivity(
+
+            PendingIntent pendingIntent = PendingIntent.getActivity(
                     context,
                     0,
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-            final Notification.Builder builder =
+            Notification.Builder builder =
                     new Notification.Builder(context, CHANNEL_ID);
             builder.setSmallIcon(R.drawable.ic_keyboard)
                     .setContentTitle(context.getString(
@@ -60,20 +63,26 @@ public final class KeyboardNotification {
                             Icon.createWithResource(context, R.drawable.ic_keyboard),
                             context.getString(R.string.notification_switch_back),
                             pendingIntent).build());
+
             manager.notify(NOTIFICATION_ID, builder.build());
-        } catch (final RuntimeException exception) {
+        } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to post keyboard notification", exception);
         }
     }
 
-    private static void ensureChannel(
-            final Context context, final NotificationManager manager) {
-        final NotificationChannel channel = new NotificationChannel(
+    private static void ensureChannel(Context context, NotificationManager manager) {
+        NotificationChannel existing = manager.getNotificationChannel(CHANNEL_ID);
+        if (existing != null) {
+            return;
+        }
+
+        NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 context.getString(R.string.notification_channel_name),
                 NotificationManager.IMPORTANCE_LOW);
         channel.setDescription(context.getString(
                 R.string.notification_channel_description));
+
         manager.createNotificationChannel(channel);
     }
 }

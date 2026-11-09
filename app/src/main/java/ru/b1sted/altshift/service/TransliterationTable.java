@@ -49,17 +49,19 @@ final class TransliterationTable {
     private TransliterationTable() {
     }
 
-    static String lookup(final int keyCode, final boolean shifted, final boolean capsLock) {
+    static String lookup(int keyCode, boolean shifted, boolean capsLock) {
         if (keyCode < 0 || keyCode >= TABLE_SIZE) {
             return null;
         }
+
         return (shifted ^ capsLock) ? UPPER[keyCode] : LOWER[keyCode];
     }
 
-    private static void put(final int keyCode, final String lower, final String upper) {
+    private static void put(int keyCode, String lower, String upper) {
         if (keyCode <= 0 || keyCode >= TABLE_SIZE) {
             return;
         }
+
         LOWER[keyCode] = lower;
         UPPER[keyCode] = upper;
     }

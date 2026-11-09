@@ -31,32 +31,28 @@ public final class KeyCaptureDialog {
     }
 
     public static void show(
-            final Context context,
-            @Nullable final LanguageSwitchShortcut current,
-            final Listener listener) {
+            Context context,
+            @Nullable LanguageSwitchShortcut current,
+            Listener listener) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(listener, "listener");
 
-        final DialogKeyCaptureBinding binding =
+        DialogKeyCaptureBinding binding =
                 DialogKeyCaptureBinding.inflate(LayoutInflater.from(context));
-        final int[] capturedKeyCode = {0};
-        final boolean[] capturedCtrl = {false};
-        final boolean[] capturedAlt = {false};
-        final boolean[] capturedShift = {false};
-        final boolean[] capturedMeta = {false};
+        KeyCaptureState state = new KeyCaptureState();
 
         if (current != null) {
-            capturedKeyCode[0] = current.keyCode();
-            capturedCtrl[0] = current.isCtrl();
-            capturedAlt[0] = current.isAlt();
-            capturedShift[0] = current.isShift();
-            capturedMeta[0] = current.isMeta();
+            state.keyCode = current.keyCode();
+            state.ctrl = current.isCtrl();
+            state.alt = current.isAlt();
+            state.shift = current.isShift();
+            state.meta = current.isMeta();
             binding.capturedText.setText(KeyLabelFormatter.format(current));
         } else {
             binding.capturedText.setText(R.string.capture_key_none);
         }
 
-        final AlertDialog dialog = new MaterialAlertDialogBuilder(context)
+        AlertDialog dialog = new MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.capture_key_title)
                 .setView(binding.getRoot())
                 .setPositiveButton(R.string.save, null)
@@ -64,53 +60,81 @@ public final class KeyCaptureDialog {
                 .create();
 
         dialog.setOnShowListener(ignored -> {
-            final Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-            positive.setEnabled(capturedKeyCode[0] > 0);
+            Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            positive.setEnabled(state.isValid());
             positive.setOnClickListener(view -> {
-                if (capturedKeyCode[0] <= 0) {
+                if (!state.isValid()) {
                     return;
                 }
+
                 listener.onCaptured(
-                        capturedKeyCode[0],
-                        capturedCtrl[0],
-                        capturedAlt[0],
-                        capturedShift[0],
-                        capturedMeta[0]);
+                        state.keyCode,
+                        state.ctrl,
+                        state.alt,
+                        state.shift,
+                        state.meta);
                 dialog.dismiss();
             });
         });
 
         dialog.setOnKeyListener((ignored, keyCode, event) -> {
+            if (event == null) {
+                return false;
+            }
+
             if (event.getAction() != KeyEvent.ACTION_DOWN) {
                 return true;
             }
+
             if (event.getRepeatCount() > 0) {
                 return true;
             }
+
             if (keyCode == KeyEvent.KEYCODE_BACK) {
                 return false;
             }
+
             if (keyCode == KeyEvent.KEYCODE_UNKNOWN) {
                 return true;
             }
-            capturedKeyCode[0] = keyCode;
-            capturedCtrl[0] = event.isCtrlPressed();
-            capturedAlt[0] = event.isAltPressed();
-            capturedShift[0] = event.isShiftPressed();
-            capturedMeta[0] = event.isMetaPressed();
+
+            state.update(keyCode, event);
             binding.capturedText.setText(KeyLabelFormatter.format(
-                    keyCode,
-                    capturedCtrl[0],
-                    capturedAlt[0],
-                    capturedShift[0],
-                    capturedMeta[0]));
-            final Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                    state.keyCode,
+                    state.ctrl,
+                    state.alt,
+                    state.shift,
+                    state.meta));
+
+            Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
             if (positive != null) {
                 positive.setEnabled(true);
             }
+
             return true;
         });
 
         dialog.show();
+    }
+
+    private static final class KeyCaptureState {
+
+        int keyCode = 0;
+        boolean ctrl;
+        boolean alt;
+        boolean shift;
+        boolean meta;
+
+        boolean isValid() {
+            return keyCode > 0;
+        }
+
+        void update(int keyCode, KeyEvent event) {
+            this.keyCode = keyCode;
+            ctrl = event.isCtrlPressed();
+            alt = event.isAltPressed();
+            shift = event.isShiftPressed();
+            meta = event.isMetaPressed();
+        }
     }
 }
