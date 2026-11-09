@@ -26,9 +26,6 @@ import ru.b1sted.altshift.ui.MainActivity;
  */
 public final class KeyboardSwitchService extends Service {
 
-    public static final String ACTION_STOP =
-            "ru.b1sted.altshift.action.STOP_AUTO_SWITCH";
-
     private static final String TAG = "AltShift";
     private static final String CHANNEL_ID = "auto_switch";
     private static final int NOTIFICATION_ID = 1002;
@@ -92,12 +89,6 @@ public final class KeyboardSwitchService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
-            stopSelf();
-
-            return START_NOT_STICKY;
-        }
-
         if (!isAutoSwitchAllowed()) {
             stopSelf();
 
@@ -174,6 +165,7 @@ public final class KeyboardSwitchService extends Service {
         if (present) {
             if (!InputMethodSwitcher.switchToAltShift(this)) {
                 Log.w(TAG, "Unable to switch to AltShift automatically");
+                KeyboardNotification.showReconnected(this);
             }
 
             return;
@@ -221,7 +213,7 @@ public final class KeyboardSwitchService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new Notification.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_keyboard)
+                .setSmallIcon(R.drawable.ic_notification_keyboard)
                 .setContentTitle(getString(R.string.auto_switch_notification_title))
                 .setContentText(getString(R.string.auto_switch_notification_text))
                 .setContentIntent(pendingIntent)

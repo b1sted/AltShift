@@ -80,9 +80,30 @@ public final class InputMethodSwitcher {
             return true;
         }
 
+        if (!isAltShiftEnabled(context)) {
+            Log.w(TAG, "AltShift is not enabled in system settings");
+
+            return false;
+        }
+
         rememberCurrentSoftKeyboard(context);
 
         return setDefaultInputMethod(context, ALTSHIFT_IME_ID);
+    }
+
+    public static boolean isAltShiftEnabled(Context context) {
+        List<InputMethodInfo> methods = readEnabledInputMethods(context);
+        if (methods == null) {
+            return false;
+        }
+
+        for (int index = 0; index < methods.size(); index++) {
+            if (isAltShiftId(methods.get(index).getId())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static boolean switchToSoftKeyboard(Context context) {

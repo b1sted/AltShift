@@ -62,7 +62,7 @@ public final class KeyboardNotification {
 
             Notification.Builder builder =
                     new Notification.Builder(context, CHANNEL_ID);
-            builder.setSmallIcon(R.drawable.ic_keyboard)
+            builder.setSmallIcon(R.drawable.ic_notification_keyboard)
                     .setContentTitle(context.getString(
                             R.string.notification_keyboard_title))
                     .setContentText(context.getString(
@@ -71,7 +71,7 @@ public final class KeyboardNotification {
                     .setAutoCancel(true)
                     .setCategory(Notification.CATEGORY_STATUS)
                     .addAction(new Notification.Action.Builder(
-                            Icon.createWithResource(context, R.drawable.ic_keyboard),
+                            Icon.createWithResource(context, R.drawable.ic_notification_keyboard),
                             context.getString(R.string.notification_switch_back),
                             pendingIntent).build());
 

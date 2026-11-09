@@ -1,17 +1,14 @@
 package ru.b1sted.altshift.ui;
 
 import android.Manifest;
-import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
-import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
@@ -22,12 +19,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import java.util.List;
 import java.util.Objects;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ActivityOnboardingBinding;
-import ru.b1sted.altshift.service.HardwareInputService;
+import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 
 public final class OnboardingActivity extends AppCompatActivity {
@@ -59,8 +55,7 @@ public final class OnboardingActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         binding.primaryButton.setOnClickListener(view -> handlePrimaryAction());
-        binding.secondaryButton.setOnClickListener(
-                view -> requestNotificationPermission());
+        binding.secondaryButton.setOnClickListener(view -> handleSecondaryAction());
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -196,9 +191,17 @@ public final class OnboardingActivity extends AppCompatActivity {
 
     private void refreshPermissionsStep(
             boolean overlayGranted, boolean notificationsGranted) {
-        binding.primaryButton.setText(overlayGranted
-                ? R.string.onboarding_step_finish
-                : R.string.onboarding_step_permissions_action);
+        boolean notificationsRequired =
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                        && !notificationsGranted;
+
+        if (!overlayGranted) {
+            binding.primaryButton.setText(R.string.onboarding_step_permissions_action);
+        } else if (notificationsRequired) {
+            binding.primaryButton.setText(R.string.onboarding_notifications_action);
+        } else {
+            binding.primaryButton.setText(R.string.onboarding_step_finish);
+        }
 
         String overlayStatus = getString(overlayGranted
                 ? R.string.onboarding_overlay_granted
@@ -213,17 +216,28 @@ public final class OnboardingActivity extends AppCompatActivity {
                         ? R.color.brand_success
                         : R.color.brand_error));
 
-        boolean showNotificationAction =
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                        && !notificationsGranted;
-        binding.secondaryButton.setVisibility(
-                showNotificationAction ? View.VISIBLE : View.GONE);
-        binding.secondaryButton.setText(R.string.onboarding_notifications_action);
+        boolean showSecondary = notificationsRequired;
+        binding.secondaryButton.setVisibility(showSecondary ? View.VISIBLE : View.GONE);
+        binding.secondaryButton.setText(overlayGranted
+                ? R.string.onboarding_finish_anyway
+                : R.string.onboarding_notifications_action);
 
-        if (showNotificationAction && !notificationRequested) {
+        if (notificationsRequired && !notificationRequested) {
             notificationRequested = true;
             requestNotificationPermission();
         }
+    }
+
+    private void handleSecondaryAction() {
+        if (currentStep == STEP_PERMISSIONS
+                && Settings.canDrawOverlays(this)
+                && !hasNotificationPermission()) {
+            completeOnboarding();
+
+            return;
+        }
+
+        requestNotificationPermission();
     }
 
     private void handlePrimaryAction() {
@@ -259,6 +273,12 @@ public final class OnboardingActivity extends AppCompatActivity {
                     return;
                 }
 
+                if (!hasNotificationPermission()) {
+                    requestNotificationPermission();
+
+                    return;
+                }
+
                 completeOnboarding();
             }
         }
@@ -277,55 +297,11 @@ public final class OnboardingActivity extends AppCompatActivity {
     }
 
     private boolean isImeEnabled() {
-        List<InputMethodInfo> methods = readEnabledInputMethods();
-        if (methods == null) {
-            return false;
-        }
-
-        ComponentName component = new ComponentName(this, HardwareInputService.class);
-
-        for (int index = 0; index < methods.size(); index++) {
-            if (component.equals(methods.get(index).getComponent())) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    @Nullable
-    private List<InputMethodInfo> readEnabledInputMethods() {
-        try {
-            InputMethodManager manager = getSystemService(InputMethodManager.class);
-            if (manager == null) {
-                return null;
-            }
-
-            return manager.getEnabledInputMethodList();
-        } catch (RuntimeException exception) {
-            Log.e(TAG, "Unable to query enabled input methods", exception);
-
-            return null;
-        }
+        return InputMethodSwitcher.isAltShiftEnabled(this);
     }
 
     private boolean isAltShiftActive() {
-        try {
-            String active = Settings.Secure.getString(
-                    getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
-            if (TextUtils.isEmpty(active)) {
-                return false;
-            }
-
-            ComponentName component = new ComponentName(this, HardwareInputService.class);
-
-            return active.contains(component.flattenToString())
-                    || active.contains(component.flattenToShortString());
-        } catch (RuntimeException exception) {
-            Log.w(TAG, "Unable to read the active input method", exception);
-
-            return false;
-        }
+        return InputMethodSwitcher.isAltShiftActive(this);
     }
 
     private boolean hasNotificationPermission() {
