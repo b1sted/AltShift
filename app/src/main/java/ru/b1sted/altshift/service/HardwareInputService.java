@@ -39,11 +39,13 @@ public final class HardwareInputService extends InputMethodService {
 
     @Override
     public boolean onEvaluateInputViewShown() {
+        super.onEvaluateInputViewShown();
         return false;
     }
 
     @Override
     public boolean onShowInputRequested(final int flags, final boolean configChange) {
+        super.onShowInputRequested(flags, configChange);
         return false;
     }
 

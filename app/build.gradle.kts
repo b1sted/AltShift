@@ -32,6 +32,11 @@ android {
             )
         }
     }
+
+    lint {
+        // Pinned to the newest releases compatible with compileSdk 34.
+        disable += "GradleDependency"
+    }
 }
 
 dependencies {
