@@ -7,6 +7,7 @@
     <string name="ime_status_title">Input method status</string>
     <string name="ime_status_active">AltShift is the active input method.</string>
     <string name="ime_status_enabled_not_selected">AltShift is enabled but not selected. Choose it as the current keyboard.</string>
+    <string name="ime_status_enabled_verify">AltShift is enabled. Open keyboard settings to confirm it is selected as the current keyboard.</string>
     <string name="ime_status_disabled">AltShift is not enabled. Enable it in system settings to use hardware shortcuts.</string>
     <string name="open_ime_settings">Open keyboard settings</string>
 

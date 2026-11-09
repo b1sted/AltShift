@@ -7,12 +7,15 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.view.inputmethod.InputMethodInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import java.util.List;
 import java.util.Objects;
 
 import ru.b1sted.altshift.R;
@@ -66,12 +69,10 @@ public final class MainActivity extends AppCompatActivity {
     private void refreshImeStatus() {
         final ComponentName component =
                 new ComponentName(this, HardwareInputService.class);
-        final String enabled = Settings.Secure.getString(
-                getContentResolver(), Settings.Secure.ENABLED_INPUT_METHODS);
-        final String active = Settings.Secure.getString(
-                getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
-        final boolean isEnabled = matchesComponent(enabled, component);
-        final boolean isActive = matchesComponent(active, component);
+        final boolean isEnabled = isImeEnabled(component);
+        final String active = readSecureSetting(Settings.Secure.DEFAULT_INPUT_METHOD);
+        final boolean isActiveKnown = active != null;
+        final boolean isActive = isActiveKnown && matchesComponent(active, component);
 
         if (isActive) {
             binding.imeStatusText.setText(R.string.ime_status_active);
@@ -79,11 +80,44 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
         if (isEnabled) {
-            binding.imeStatusText.setText(R.string.ime_status_enabled_not_selected);
+            binding.imeStatusText.setText(isActiveKnown
+                    ? R.string.ime_status_enabled_not_selected
+                    : R.string.ime_status_enabled_verify);
         } else {
             binding.imeStatusText.setText(R.string.ime_status_disabled);
         }
         binding.imeSettingsButton.setVisibility(View.VISIBLE);
+    }
+
+    private boolean isImeEnabled(final ComponentName component) {
+        try {
+            final InputMethodManager manager = getSystemService(InputMethodManager.class);
+            if (manager == null) {
+                return false;
+            }
+            final List<InputMethodInfo> methods = manager.getEnabledInputMethodList();
+            for (int index = 0; index < methods.size(); index++) {
+                if (component.equals(methods.get(index).getComponent())) {
+                    return true;
+                }
+            }
+        } catch (final RuntimeException exception) {
+            Log.e(TAG, "Unable to query enabled input methods", exception);
+        }
+        return false;
+    }
+
+    @Nullable
+    private String readSecureSetting(final String key) {
+        try {
+            return Settings.Secure.getString(getContentResolver(), key);
+        } catch (final SecurityException exception) {
+            Log.w(TAG, "Secure setting is restricted: " + key, exception);
+            return null;
+        } catch (final RuntimeException exception) {
+            Log.e(TAG, "Unable to read secure setting: " + key, exception);
+            return null;
+        }
     }
 
     private static boolean matchesComponent(
