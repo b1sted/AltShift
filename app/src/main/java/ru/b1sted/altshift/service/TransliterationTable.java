@@ -7,43 +7,58 @@ final class TransliterationTable {
     private static final int TABLE_SIZE = 320;
     private static final String[] LOWER = new String[TABLE_SIZE];
     private static final String[] UPPER = new String[TABLE_SIZE];
+    private static final boolean[] LETTER = new boolean[TABLE_SIZE];
 
     static {
-        put(KeyEvent.KEYCODE_GRAVE, "ё", "Ё");
-        put(KeyEvent.KEYCODE_Q, "й", "Й");
-        put(KeyEvent.KEYCODE_W, "ц", "Ц");
-        put(KeyEvent.KEYCODE_E, "у", "У");
-        put(KeyEvent.KEYCODE_R, "к", "К");
-        put(KeyEvent.KEYCODE_T, "е", "Е");
-        put(KeyEvent.KEYCODE_Y, "н", "Н");
-        put(KeyEvent.KEYCODE_U, "г", "Г");
-        put(KeyEvent.KEYCODE_I, "ш", "Ш");
-        put(KeyEvent.KEYCODE_O, "щ", "Щ");
-        put(KeyEvent.KEYCODE_P, "з", "З");
-        put(KeyEvent.KEYCODE_LEFT_BRACKET, "х", "Х");
-        put(KeyEvent.KEYCODE_RIGHT_BRACKET, "ъ", "Ъ");
-        put(KeyEvent.KEYCODE_A, "ф", "Ф");
-        put(KeyEvent.KEYCODE_S, "ы", "Ы");
-        put(KeyEvent.KEYCODE_D, "в", "В");
-        put(KeyEvent.KEYCODE_F, "а", "А");
-        put(KeyEvent.KEYCODE_G, "п", "П");
-        put(KeyEvent.KEYCODE_H, "р", "Р");
-        put(KeyEvent.KEYCODE_J, "о", "О");
-        put(KeyEvent.KEYCODE_K, "л", "Л");
-        put(KeyEvent.KEYCODE_L, "д", "Д");
-        put(KeyEvent.KEYCODE_SEMICOLON, "ж", "Ж");
-        put(KeyEvent.KEYCODE_APOSTROPHE, "э", "Э");
-        put(KeyEvent.KEYCODE_Z, "я", "Я");
-        put(KeyEvent.KEYCODE_X, "ч", "Ч");
-        put(KeyEvent.KEYCODE_C, "с", "С");
-        put(KeyEvent.KEYCODE_V, "м", "М");
-        put(KeyEvent.KEYCODE_B, "и", "И");
-        put(KeyEvent.KEYCODE_N, "т", "Т");
-        put(KeyEvent.KEYCODE_M, "ь", "Ь");
-        put(KeyEvent.KEYCODE_COMMA, "б", "Б");
-        put(KeyEvent.KEYCODE_PERIOD, "ю", "Ю");
-        put(KeyEvent.KEYCODE_SLASH, ".", ",");
-        put(KeyEvent.KEYCODE_BACKSLASH, "\\", "/");
+        putLetter(KeyEvent.KEYCODE_GRAVE, "ё", "Ё");
+        putLetter(KeyEvent.KEYCODE_Q, "й", "Й");
+        putLetter(KeyEvent.KEYCODE_W, "ц", "Ц");
+        putLetter(KeyEvent.KEYCODE_E, "у", "У");
+        putLetter(KeyEvent.KEYCODE_R, "к", "К");
+        putLetter(KeyEvent.KEYCODE_T, "е", "Е");
+        putLetter(KeyEvent.KEYCODE_Y, "н", "Н");
+        putLetter(KeyEvent.KEYCODE_U, "г", "Г");
+        putLetter(KeyEvent.KEYCODE_I, "ш", "Ш");
+        putLetter(KeyEvent.KEYCODE_O, "щ", "Щ");
+        putLetter(KeyEvent.KEYCODE_P, "з", "З");
+        putLetter(KeyEvent.KEYCODE_LEFT_BRACKET, "х", "Х");
+        putLetter(KeyEvent.KEYCODE_RIGHT_BRACKET, "ъ", "Ъ");
+        putLetter(KeyEvent.KEYCODE_A, "ф", "Ф");
+        putLetter(KeyEvent.KEYCODE_S, "ы", "Ы");
+        putLetter(KeyEvent.KEYCODE_D, "в", "В");
+        putLetter(KeyEvent.KEYCODE_F, "а", "А");
+        putLetter(KeyEvent.KEYCODE_G, "п", "П");
+        putLetter(KeyEvent.KEYCODE_H, "р", "Р");
+        putLetter(KeyEvent.KEYCODE_J, "о", "О");
+        putLetter(KeyEvent.KEYCODE_K, "л", "Л");
+        putLetter(KeyEvent.KEYCODE_L, "д", "Д");
+        putLetter(KeyEvent.KEYCODE_SEMICOLON, "ж", "Ж");
+        putLetter(KeyEvent.KEYCODE_APOSTROPHE, "э", "Э");
+        putLetter(KeyEvent.KEYCODE_Z, "я", "Я");
+        putLetter(KeyEvent.KEYCODE_X, "ч", "Ч");
+        putLetter(KeyEvent.KEYCODE_C, "с", "С");
+        putLetter(KeyEvent.KEYCODE_V, "м", "М");
+        putLetter(KeyEvent.KEYCODE_B, "и", "И");
+        putLetter(KeyEvent.KEYCODE_N, "т", "Т");
+        putLetter(KeyEvent.KEYCODE_M, "ь", "Ь");
+        putLetter(KeyEvent.KEYCODE_COMMA, "б", "Б");
+        putLetter(KeyEvent.KEYCODE_PERIOD, "ю", "Ю");
+
+        putSymbol(KeyEvent.KEYCODE_SLASH, ".", ",");
+        putSymbol(KeyEvent.KEYCODE_BACKSLASH, "\\", "/");
+
+        putSymbol(KeyEvent.KEYCODE_1, "1", "!");
+        putSymbol(KeyEvent.KEYCODE_2, "2", "\"");
+        putSymbol(KeyEvent.KEYCODE_3, "3", "\u2116");
+        putSymbol(KeyEvent.KEYCODE_4, "4", ";");
+        putSymbol(KeyEvent.KEYCODE_5, "5", "%");
+        putSymbol(KeyEvent.KEYCODE_6, "6", ":");
+        putSymbol(KeyEvent.KEYCODE_7, "7", "?");
+        putSymbol(KeyEvent.KEYCODE_8, "8", "*");
+        putSymbol(KeyEvent.KEYCODE_9, "9", "(");
+        putSymbol(KeyEvent.KEYCODE_0, "0", ")");
+        putSymbol(KeyEvent.KEYCODE_MINUS, "-", "_");
+        putSymbol(KeyEvent.KEYCODE_EQUALS, "=", "+");
     }
 
     private TransliterationTable() {
@@ -54,15 +69,27 @@ final class TransliterationTable {
             return null;
         }
 
-        return (shifted ^ capsLock) ? UPPER[keyCode] : LOWER[keyCode];
+        boolean effectiveShift = LETTER[keyCode] ? shifted ^ capsLock : shifted;
+
+        return effectiveShift ? UPPER[keyCode] : LOWER[keyCode];
     }
 
-    private static void put(int keyCode, String lower, String upper) {
+    private static void putLetter(int keyCode, String lower, String upper) {
         if (keyCode <= 0 || keyCode >= TABLE_SIZE) {
             return;
         }
 
         LOWER[keyCode] = lower;
         UPPER[keyCode] = upper;
+        LETTER[keyCode] = true;
+    }
+
+    private static void putSymbol(int keyCode, String unshifted, String shifted) {
+        if (keyCode <= 0 || keyCode >= TABLE_SIZE) {
+            return;
+        }
+
+        LOWER[keyCode] = unshifted;
+        UPPER[keyCode] = shifted;
     }
 }

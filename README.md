@@ -10,7 +10,7 @@
         <img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License" />
     </a>
     <a href="#">
-        <img src="https://img.shields.io/badge/Version-0.3-green?style=flat-square" alt="Version" />
+        <img src="https://img.shields.io/badge/Version-0.3.1-green?style=flat-square" alt="Version" />
     </a>
     <a href="#">
         <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-brightgreen?style=flat-square" alt="Platform" />
@@ -41,7 +41,7 @@ The service is written in pure Java 21 with native XML views and Material 3 comp
 
 ## Features
 
-- **Russian transliteration**: Standard ЙЦУКЕН mapping with Shift and CapsLock support, including punctuation.
+- **Russian transliteration**: Standard ЙЦУКЕН mapping with Shift and CapsLock support, including full Russian PC layout emulation for the number row and punctuation symbols.
 - **Language toggle**: Default `Alt + Shift`, configurable from the settings UI. The OS subtype switcher is bypassed.
 - **App hotkeys**: Bind any physical key combination to an installed application.
 - **Zero-allocation input loop**: Static primitive-indexed lookup tables and preallocated strings; no iterators, string concatenation, or runtime allocation while typing.
