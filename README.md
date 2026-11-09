@@ -10,7 +10,7 @@
         <img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License" />
     </a>
     <a href="#">
-        <img src="https://img.shields.io/badge/Version-0.2-green?style=flat-square" alt="Version" />
+        <img src="https://img.shields.io/badge/Version-0.3-green?style=flat-square" alt="Version" />
     </a>
     <a href="#">
         <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-brightgreen?style=flat-square" alt="Platform" />
@@ -28,14 +28,14 @@
 <hr>
 
 <p align="center">
-    <img src="docs/screenshots/gui.png" alt="AltShift setup screen" width="720" />
+    <img src="docs/screenshots/gui.png" alt="AltShift dashboard" width="720" />
 </p>
 
 A minimal input method service for physical keyboards on Android. AltShift maps Latin scancodes to Cyrillic characters in a single, allocation-free lookup table and launches applications from user-defined hardware key combinations. No cloud services, no telemetry, no background daemons.
 
 ## Overview
 
-AltShift is a hardware-first IME. It does not draw a full soft keyboard; it sits between the physical keyboard and the focused application, translates key events when Russian mode is active, and consumes only the combinations explicitly configured by the user. Everything else is passed through untouched. When the physical keyboard disconnects, AltShift offers a one-tap fallback to the system keyboard and prompts to switch back after reconnection.
+AltShift is a hardware-first IME. It does not draw a full soft keyboard; it sits between the physical keyboard and the focused application, translates key events when Russian mode is active, and consumes only the combinations explicitly configured by the user. Everything else is passed through untouched. A fullscreen onboarding wizard verifies IME enablement, active selection, overlay access, and notification delivery. When a physical keyboard is attached or removed, AltShift can switch input methods automatically through the secure settings permission, or fall back to a one-tap notification prompt.
 
 The service is written in pure Java 21 with native XML views and Material 3 components. Configuration is stored locally in `SharedPreferences` as JSON. The project has no Kotlin source files and no annotation processors.
 
@@ -46,9 +46,11 @@ The service is written in pure Java 21 with native XML views and Material 3 comp
 - **App hotkeys**: Bind any physical key combination to an installed application.
 - **Zero-allocation input loop**: Static primitive-indexed lookup tables and preallocated strings; no iterators, string concatenation, or runtime allocation while typing.
 - **Fail-safe service**: External intents and input connection calls are guarded; an IME exception must never take down system input.
-- **Guided setup**: A three-step onboarding card verifies IME enablement, active IME selection, and overlay permission.
-- **Soft keyboard fallback**: Detects physical keyboard removal and switches to the preferred on-screen keyboard, with a one-tap pill and a reconnection prompt as fallbacks.
-- **Native settings**: Material 3 toolbar, setup stepper, hotkey list, key-capture dialog, and application picker.
+- **Fullscreen onboarding**: A Gboard-style three-step wizard with large iconography, step indicator dots, and one-tap permission actions.
+- **Seamless auto-switching**: With `WRITE_SECURE_SETTINGS`, AltShift switches to itself when a hardware keyboard attaches and back to Gboard or the previous soft keyboard when it detaches, without pickers or prompts.
+- **Theme modes**: Light, dark, and system themes persisted across launches and applied application-wide.
+- **Soft keyboard fallback**: Detects physical keyboard removal and switches to the preferred on-screen keyboard, with a one-tap pill and a reconnection notification as fallbacks.
+- **Native settings**: Material 3 dashboard, toolbar status badge, language shortcut card, auto-switch controls, hotkey list, key-capture dialog, and application picker.
 - **Zero bloat**: No DI framework, no Kotlin, no Compose. `SharedPreferences` and `org.json` only.
 
 ## Requirements
@@ -98,6 +100,14 @@ Install or update the debug build:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Grant the secure settings permission to enable autonomous input method switching:
+
+```bash
+adb shell pm grant ru.b1sted.altshift android.permission.WRITE_SECURE_SETTINGS
+```
+
+This development permission is optional. Without it, AltShift falls back to the notification and keyboard picker prompts. Android 13 and newer also request notification permission on first launch.
+
 Enable the input method:
 
 ```bash
@@ -126,8 +136,10 @@ Open **AltShift** from the launcher.
 | --- | --- | --- |
 | Language switch | `Alt + Shift` | Toggles Russian transliteration. Captured from the next physical combination. |
 | App hotkeys | Empty | Each binding maps a modifier mask and key code to an installed application. |
+| Theme | System default | Light, dark, or system theme, applied application-wide and persisted. |
+| Seamless auto-switching | On | Switches between AltShift and the soft keyboard when a hardware keyboard attaches or detaches. Requires `WRITE_SECURE_SETTINGS`. |
 
-The setup stepper reports whether AltShift is enabled and selected, and offers a one-tap action for each missing requirement. App shortcuts are stored per package and can be removed from the list.
+The fullscreen onboarding wizard reports whether AltShift is enabled and selected, requests notification permission on Android 13+, and provides a one-tap overlay permission action. The dashboard shows a toolbar status badge, the language shortcut card, the auto-switch toggle, and the app hotkey list. App shortcuts are stored per package and can be removed from the list.
 
 Configuration data lives in the app's private `SharedPreferences` file. Uninstalling the application removes it.
 
