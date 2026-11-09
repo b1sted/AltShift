@@ -1,17 +1,23 @@
 package ru.b1sted.altshift.ui;
 
+import android.Manifest;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -34,6 +40,7 @@ public final class MainActivity extends AppCompatActivity {
             "ru.b1sted.altshift.extra.OPEN_IME_PICKER";
 
     private static final String TAG = "AltShift";
+    private static final int REQUEST_NOTIFICATIONS = 3001;
 
     private ActivityMainBinding binding;
     private HotkeyRepository repository;
@@ -74,6 +81,19 @@ public final class MainActivity extends AppCompatActivity {
 
         openPickerOnResume = getIntent().getBooleanExtra(
                 EXTRA_OPEN_IME_PICKER, false);
+        refreshAll();
+        requestNotificationPermissionIfNeeded();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode != REQUEST_NOTIFICATIONS) {
+            return;
+        }
+
         refreshAll();
     }
 
@@ -215,6 +235,23 @@ public final class MainActivity extends AppCompatActivity {
                 getString(R.string.auto_switch_command));
         clipboard.setPrimaryClip(clip);
         toast(R.string.command_copied);
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+
+        if (ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                REQUEST_NOTIFICATIONS);
     }
 
     private void updateAutoSwitchService(boolean enabled, boolean permission) {
