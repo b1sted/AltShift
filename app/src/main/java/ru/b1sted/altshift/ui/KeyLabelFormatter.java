@@ -3,6 +3,7 @@ package ru.b1sted.altshift.ui;
 import android.view.KeyEvent;
 
 import ru.b1sted.altshift.model.HotkeyBinding;
+import ru.b1sted.altshift.model.KeyMatcher;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
 
 public final class KeyLabelFormatter {
@@ -47,7 +48,14 @@ public final class KeyLabelFormatter {
         if (meta) {
             builder.append("Meta+");
         }
-        builder.append(keyName(keyCode));
+        if (KeyMatcher.isModifierKey(keyCode)
+                && KeyMatcher.isModifierActive(keyCode, ctrl, alt, shift, meta)) {
+            if (builder.length() > 0 && builder.charAt(builder.length() - 1) == '+') {
+                builder.setLength(builder.length() - 1);
+            }
+        } else {
+            builder.append(keyName(keyCode));
+        }
         return builder.toString();
     }
 
@@ -93,7 +101,37 @@ public final class KeyLabelFormatter {
                 return ".";
             case KeyEvent.KEYCODE_SLASH:
                 return "/";
+            case KeyEvent.KEYCODE_DEL:
+                return "Backspace";
+            case KeyEvent.KEYCODE_FORWARD_DEL:
+                return "Delete";
+            case KeyEvent.KEYCODE_ESCAPE:
+                return "Esc";
+            case KeyEvent.KEYCODE_DPAD_UP:
+                return "Up";
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                return "Down";
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                return "Left";
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                return "Right";
+            case KeyEvent.KEYCODE_MOVE_HOME:
+                return "Home";
+            case KeyEvent.KEYCODE_MOVE_END:
+                return "End";
+            case KeyEvent.KEYCODE_PAGE_UP:
+                return "Page Up";
+            case KeyEvent.KEYCODE_PAGE_DOWN:
+                return "Page Down";
             default:
+                if (keyCode >= KeyEvent.KEYCODE_A && keyCode <= KeyEvent.KEYCODE_Z) {
+                    return String.valueOf(
+                            (char) ('A' + keyCode - KeyEvent.KEYCODE_A));
+                }
+                if (keyCode >= KeyEvent.KEYCODE_0 && keyCode <= KeyEvent.KEYCODE_9) {
+                    return String.valueOf(
+                            (char) ('0' + keyCode - KeyEvent.KEYCODE_0));
+                }
                 final String name = KeyEvent.keyCodeToString(keyCode);
                 if (name == null) {
                     return "Key " + keyCode;

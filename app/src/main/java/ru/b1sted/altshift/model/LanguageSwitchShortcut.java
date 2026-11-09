@@ -24,10 +24,16 @@ public record LanguageSwitchShortcut(
             final boolean alt,
             final boolean shift,
             final boolean meta) {
-        return keyCode == candidateKeyCode
-                && isCtrl == ctrl
-                && isAlt == alt
-                && isShift == shift
-                && isMeta == meta;
+        return KeyMatcher.matches(
+                keyCode,
+                isCtrl,
+                isAlt,
+                isShift,
+                isMeta,
+                candidateKeyCode,
+                ctrl,
+                alt,
+                shift,
+                meta);
     }
 }
