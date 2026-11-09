@@ -3,4 +3,36 @@
     <string name="app_name">AltShift</string>
     <string name="ime_name">AltShift</string>
     <string name="ime_subtype_label">AltShift hardware keyboard</string>
+
+    <string name="ime_status_title">Input method status</string>
+    <string name="ime_status_active">AltShift is the active input method.</string>
+    <string name="ime_status_enabled_not_selected">AltShift is enabled but not selected. Choose it as the current keyboard.</string>
+    <string name="ime_status_disabled">AltShift is not enabled. Enable it in system settings to use hardware shortcuts.</string>
+    <string name="open_ime_settings">Open keyboard settings</string>
+
+    <string name="language_section_title">Language switch</string>
+    <string name="language_shortcut_label">Shortcut</string>
+    <string name="change">Change</string>
+
+    <string name="app_hotkeys_section_title">App hotkeys</string>
+    <string name="no_hotkeys">No app shortcuts configured yet.</string>
+    <string name="add_hotkey">Add app shortcut</string>
+    <string name="delete_hotkey">Delete shortcut</string>
+    <string name="delete_hotkey_for">Delete shortcut for %1$s</string>
+    <string name="app_icon">Application icon</string>
+
+    <string name="capture_key_title">Capture key combination</string>
+    <string name="capture_key_instruction">Press the physical key combination you want to use.</string>
+    <string name="capture_key_hint">Hold the modifier keys together, then select Save.</string>
+    <string name="capture_key_none">No keys captured</string>
+    <string name="save">Save</string>
+
+    <string name="select_app_title">Select application</string>
+    <string name="no_launchable_apps">No launchable applications found.</string>
+    <string name="app_picker_failed">Unable to load installed applications.</string>
+
+    <string name="shortcut_saved">Shortcut saved.</string>
+    <string name="shortcut_deleted">Shortcut deleted.</string>
+    <string name="shortcut_save_failed">Unable to save shortcut.</string>
+    <string name="settings_open_failed">Unable to open keyboard settings.</string>
 </resources>
