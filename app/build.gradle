@@ -10,8 +10,8 @@ android {
         applicationId 'ru.b1sted.altshift'
         minSdk 26
         targetSdk 34
-        versionCode 4
-        versionName '0.3.1'
+        versionCode 5
+        versionName '0.3.2'
     }
 
     buildFeatures {
@@ -23,16 +23,35 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
+    signingConfigs {
+        release {
+            if (System.getenv("KEYSTORE_FILE") != null) {
+                storeFile file(System.getenv("KEYSTORE_FILE"))
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 
     lint {
         // Pinned to the newest releases compatible with compileSdk 34.
         disable += 'GradleDependency'
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            def type = variant.buildType.name == 'release' ? '' : "-${variant.buildType.name}"
+            outputFileName = "AltShift-v${defaultConfig.versionName}${type}.apk"
+        }
     }
 }
 

@@ -10,7 +10,7 @@
         <img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License" />
     </a>
     <a href="#">
-        <img src="https://img.shields.io/badge/Version-0.3.1-green?style=flat-square" alt="Version" />
+        <img src="https://img.shields.io/badge/Version-0.3.2-green?style=flat-square" alt="Version" />
     </a>
     <a href="#">
         <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-brightgreen?style=flat-square" alt="Platform" />
