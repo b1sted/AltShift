@@ -78,6 +78,8 @@
     <string name="notification_keyboard_title">Physical keyboard reconnected</string>
     <string name="notification_keyboard_text">Tap to switch back to AltShift.</string>
     <string name="notification_switch_back">Switch back</string>
+    <string name="prompt_keyboard_reconnected">Keyboard reconnected</string>
+    <string name="prompt_dismiss">Dismiss</string>
 
     <string name="ime_fallback_message">Physical keyboard disconnected. Switch to an on-screen keyboard.</string>
     <string name="ime_fallback_action">Switch keyboard</string>

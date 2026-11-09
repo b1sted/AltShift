@@ -81,6 +81,31 @@ public final class KeyboardNotification {
         }
     }
 
+    public static void cancel(Context context) {
+        if (context == null) {
+            return;
+        }
+
+        try {
+            NotificationManager manager =
+                    (NotificationManager) context.getSystemService(
+                            Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                manager.cancel(NOTIFICATION_ID);
+            }
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to cancel keyboard notification", exception);
+        }
+    }
+
+    public static boolean canPost(Context context) {
+        if (context == null) {
+            return false;
+        }
+
+        return hasNotificationPermission(context);
+    }
+
     private static void ensureChannel(Context context, NotificationManager manager) {
         NotificationChannel existing = manager.getNotificationChannel(CHANNEL_ID);
         if (existing != null) {

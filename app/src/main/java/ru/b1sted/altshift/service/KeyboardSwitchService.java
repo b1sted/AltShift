@@ -12,6 +12,7 @@ import android.content.res.Configuration;
 import android.hardware.input.InputManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.provider.Settings;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -20,6 +21,7 @@ import androidx.core.app.ServiceCompat;
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.ui.MainActivity;
+import ru.b1sted.altshift.ui.SwitchBackActivity;
 
 /**
  * Event-driven foreground monitor that keeps hardware keyboard switching seamless.
@@ -110,6 +112,7 @@ public final class KeyboardSwitchService extends Service {
     @Override
     public void onDestroy() {
         unregisterDeviceListener();
+        KeyboardPromptOverlay.dismiss();
 
         super.onDestroy();
     }
@@ -125,12 +128,16 @@ public final class KeyboardSwitchService extends Service {
             HotkeyRepository repository = HotkeyRepository.getInstance(this);
 
             return repository.isAutoSwitchEnabled()
-                    && InputMethodSwitcher.hasSecureSettingsPermission(this);
+                    && (InputMethodSwitcher.hasSecureSettingsPermission(this) || canPrompt());
         } catch (RuntimeException exception) {
             Log.e(TAG, "Unable to read the auto-switch setting", exception);
 
             return false;
         }
+    }
+
+    private boolean canPrompt() {
+        return Settings.canDrawOverlays(this) || KeyboardNotification.canPost(this);
     }
 
     private void reconcileKeyboardState() {
@@ -142,7 +149,7 @@ public final class KeyboardSwitchService extends Service {
 
         boolean present = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this);
         keyboardPresent = present;
-        applyKeyboardState(present);
+        applyKeyboardState(present, false);
     }
 
     private void handleKeyboardStateChange() {
@@ -158,22 +165,41 @@ public final class KeyboardSwitchService extends Service {
         }
 
         keyboardPresent = present;
-        applyKeyboardState(present);
+        applyKeyboardState(present, true);
     }
 
-    private void applyKeyboardState(boolean present) {
+    private void applyKeyboardState(boolean present, boolean notifyOnAttach) {
         if (present) {
-            if (!InputMethodSwitcher.switchToAltShift(this)) {
-                Log.w(TAG, "Unable to switch to AltShift automatically");
-                KeyboardNotification.showReconnected(this);
+            if (InputMethodSwitcher.hasSecureSettingsPermission(this)
+                    && InputMethodSwitcher.switchToAltShift(this)) {
+                return;
+            }
+
+            if (notifyOnAttach && !InputMethodSwitcher.isAltShiftActive(this)) {
+                showReconnectPrompt();
             }
 
             return;
         }
 
-        if (!InputMethodSwitcher.switchToSoftKeyboard(this)) {
+        KeyboardPromptOverlay.dismiss();
+        if (InputMethodSwitcher.hasSecureSettingsPermission(this)
+                && !InputMethodSwitcher.switchToSoftKeyboard(this)) {
             Log.w(TAG, "Unable to switch to the soft keyboard automatically");
         }
+    }
+
+    private void showReconnectPrompt() {
+        KeyboardNotification.cancel(this);
+
+        Context appContext = getApplicationContext();
+        boolean shown = KeyboardPromptOverlay.show(
+                appContext, () -> SwitchBackActivity.start(appContext));
+        if (shown) {
+            return;
+        }
+
+        KeyboardNotification.showReconnected(appContext);
     }
 
     private void startForegroundNotification() {
