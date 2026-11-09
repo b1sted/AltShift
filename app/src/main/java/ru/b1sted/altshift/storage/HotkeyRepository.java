@@ -14,6 +14,7 @@ import java.util.Objects;
 
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
+import ru.b1sted.altshift.model.ThemeMode;
 
 public final class HotkeyRepository {
 
@@ -21,6 +22,10 @@ public final class HotkeyRepository {
     private static final String PREFS_NAME = "altshift_prefs";
     private static final String KEY_HOTKEYS = "hotkeys";
     private static final String KEY_LANGUAGE_SHORTCUT = "language_shortcut";
+    private static final String KEY_ONBOARDING_COMPLETED = "onboarding_completed";
+    private static final String KEY_AUTO_SWITCH_ENABLED = "auto_switch_enabled";
+    private static final String KEY_PREVIOUS_INPUT_METHOD = "previous_input_method";
+    private static final String KEY_THEME_MODE = "theme_mode";
     private static final HotkeyBinding[] EMPTY_BINDINGS = new HotkeyBinding[0];
 
     private static volatile HotkeyRepository instance;
@@ -30,6 +35,10 @@ public final class HotkeyRepository {
 
     private volatile HotkeyBinding[] bindings;
     private volatile LanguageSwitchShortcut languageShortcut;
+    private volatile boolean onboardingCompleted;
+    private volatile boolean autoSwitchEnabled;
+    private volatile String previousInputMethod;
+    private volatile ThemeMode themeMode;
 
     private HotkeyRepository(Context context) {
         preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -37,6 +46,10 @@ public final class HotkeyRepository {
         bindings = readBindings(preferences.getString(KEY_HOTKEYS, null));
         languageShortcut = readLanguageShortcut(
                 preferences.getString(KEY_LANGUAGE_SHORTCUT, null));
+        onboardingCompleted = preferences.getBoolean(KEY_ONBOARDING_COMPLETED, false);
+        autoSwitchEnabled = preferences.getBoolean(KEY_AUTO_SWITCH_ENABLED, true);
+        previousInputMethod = preferences.getString(KEY_PREVIOUS_INPUT_METHOD, null);
+        themeMode = ThemeMode.fromKey(preferences.getString(KEY_THEME_MODE, null));
     }
 
     public static HotkeyRepository getInstance(Context context) {
@@ -65,6 +78,65 @@ public final class HotkeyRepository {
 
     public LanguageSwitchShortcut getLanguageShortcut() {
         return languageShortcut;
+    }
+
+    public boolean isOnboardingCompleted() {
+        return onboardingCompleted;
+    }
+
+    public void setOnboardingCompleted(boolean completed) {
+        synchronized (lock) {
+            preferences.edit()
+                    .putBoolean(KEY_ONBOARDING_COMPLETED, completed)
+                    .apply();
+            onboardingCompleted = completed;
+        }
+    }
+
+    public boolean isAutoSwitchEnabled() {
+        return autoSwitchEnabled;
+    }
+
+    public void saveAutoSwitchEnabled(boolean enabled) {
+        synchronized (lock) {
+            preferences.edit()
+                    .putBoolean(KEY_AUTO_SWITCH_ENABLED, enabled)
+                    .apply();
+            autoSwitchEnabled = enabled;
+        }
+    }
+
+    public String getPreviousInputMethod() {
+        return previousInputMethod;
+    }
+
+    public void savePreviousInputMethod(String imeId) {
+        synchronized (lock) {
+            SharedPreferences.Editor editor = preferences.edit();
+            if (imeId == null || imeId.isEmpty()) {
+                editor.remove(KEY_PREVIOUS_INPUT_METHOD);
+            } else {
+                editor.putString(KEY_PREVIOUS_INPUT_METHOD, imeId);
+            }
+
+            editor.apply();
+            previousInputMethod = imeId;
+        }
+    }
+
+    public ThemeMode getThemeMode() {
+        return themeMode;
+    }
+
+    public void saveThemeMode(ThemeMode mode) {
+        Objects.requireNonNull(mode, "mode");
+
+        synchronized (lock) {
+            preferences.edit()
+                    .putString(KEY_THEME_MODE, mode.key())
+                    .apply();
+            themeMode = mode;
+        }
     }
 
     public void saveBinding(HotkeyBinding binding) {

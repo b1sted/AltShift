@@ -4,41 +4,72 @@
     <string name="ime_name">AltShift</string>
     <string name="ime_subtype_label">AltShift hardware keyboard</string>
 
-    <string name="setup_title">Setup</string>
-    <string name="setup_subtitle">Complete these steps to activate AltShift.</string>
-    <string name="step_number_one">1</string>
-    <string name="step_number_two">2</string>
-    <string name="step_number_three">3</string>
-    <string name="check_mark">✓</string>
-    <string name="setup_done">Completed</string>
+    <string name="onboarding_step_label">Step %1$d</string>
+    <string name="onboarding_step_continue">CONTINUE</string>
+    <string name="onboarding_step_finish">FINISH</string>
 
-    <string name="setup_step_enable_title">Enable input method</string>
-    <string name="setup_step_enable_ok">AltShift is enabled.</string>
-    <string name="setup_step_enable_pending">AltShift is not enabled in system settings.</string>
-    <string name="setup_step_enable_action">Enable in Settings</string>
+    <string name="onboarding_step_enable_title">Enable AltShift</string>
+    <string name="onboarding_step_enable_description">Turn on the AltShift keyboard in system settings so Android can use it.</string>
+    <string name="onboarding_step_enable_action">ENABLE IN SETTINGS</string>
+    <string name="onboarding_step_enable_status_ok">AltShift is enabled.</string>
+    <string name="onboarding_step_enable_status_pending">AltShift is not enabled yet.</string>
 
-    <string name="setup_step_select_title">Select current input method</string>
-    <string name="setup_step_select_ok">AltShift is the active input method.</string>
-    <string name="setup_step_select_pending">AltShift is enabled but not active.</string>
-    <string name="setup_step_select_blocked">Enable AltShift in Step 1 first.</string>
-    <string name="setup_step_select_action">Select AltShift</string>
+    <string name="onboarding_step_select_title">Select AltShift</string>
+    <string name="onboarding_step_select_description">Choose AltShift as the active input method for your hardware keyboard.</string>
+    <string name="onboarding_step_select_action">SELECT ALTSHIFT</string>
+    <string name="onboarding_step_select_status_ok">AltShift is the active keyboard.</string>
+    <string name="onboarding_step_select_status_pending">AltShift is enabled but not selected.</string>
+    <string name="onboarding_step_select_status_blocked">Enable AltShift in Step 1 first.</string>
 
-    <string name="setup_step_overlay_title">Background and overlay permissions</string>
-    <string name="setup_step_overlay_explanation">Needed to launch apps from hotkeys without ZUI Association Launch prompts</string>
-    <string name="setup_step_overlay_action">Grant overlay permission</string>
+    <string name="onboarding_step_permissions_title">Grant permissions</string>
+    <string name="onboarding_step_permissions_description">Allow notifications and overlay access so AltShift can switch keyboards and launch apps without system prompts.</string>
+    <string name="onboarding_step_permissions_action">GRANT OVERLAY PERMISSION</string>
+    <string name="onboarding_overlay_granted">Overlay access: granted</string>
+    <string name="onboarding_overlay_pending">Overlay access: not granted</string>
+    <string name="onboarding_status_two_lines">%1$s\n%2$s</string>
+    <string name="onboarding_notifications_granted">Notifications: enabled</string>
+    <string name="onboarding_notifications_pending">Notifications: disabled</string>
+    <string name="onboarding_notifications_action">ALLOW NOTIFICATIONS</string>
+    <string name="onboarding_finish_anyway">FINISH ANYWAY</string>
 
-    <string name="keyboard_connected">Physical keyboard: connected</string>
-    <string name="keyboard_disconnected">Physical keyboard: disconnected</string>
-    <string name="open_keyboard_picker">Open keyboard picker</string>
+    <string name="status_badge_format">%1$s · %2$s</string>
+    <string name="status_keyboard_connected">Keyboard connected</string>
+    <string name="status_keyboard_disconnected">Keyboard disconnected</string>
+    <string name="status_ime_active">IME active</string>
+    <string name="status_ime_inactive">IME inactive</string>
 
-    <string name="ime_fallback_message">Physical keyboard disconnected. Switch to an on-screen keyboard.</string>
-    <string name="ime_fallback_action">Switch keyboard</string>
+    <string name="theme_title">Theme</string>
+    <string name="theme_system">System default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <string name="auto_switch_title">Seamless auto-switching</string>
+    <string name="auto_switch_description">Switch between AltShift and your soft keyboard automatically when a hardware keyboard is attached or removed.</string>
+    <string name="auto_switch_status_active">Active</string>
+    <string name="auto_switch_status_permission">Permission required</string>
+    <string name="auto_switch_status_off">Off</string>
+    <string name="auto_switch_hint_show">How to enable</string>
+    <string name="auto_switch_hint_hide">Hide instructions</string>
+    <string name="auto_switch_hint_description">Grant the secure settings permission once over ADB. AltShift will then switch input methods without notifications or pickers.</string>
+    <string name="auto_switch_command">adb shell pm grant ru.b1sted.altshift android.permission.WRITE_SECURE_SETTINGS</string>
+    <string name="auto_switch_command_label">AltShift ADB command</string>
+    <string name="auto_switch_permission_required">Grant WRITE_SECURE_SETTINGS over ADB to enable auto-switching.</string>
+    <string name="copy_command">Copy command</string>
+    <string name="command_copied">Command copied to clipboard.</string>
+
+    <string name="auto_switch_channel_name">Auto-switching</string>
+    <string name="auto_switch_channel_description">Keeps seamless keyboard switching active.</string>
+    <string name="auto_switch_notification_title">Seamless auto-switching is on</string>
+    <string name="auto_switch_notification_text">Watching for hardware keyboard changes.</string>
 
     <string name="notification_channel_name">Keyboard state</string>
     <string name="notification_channel_description">Prompts when a physical keyboard is reconnected.</string>
     <string name="notification_keyboard_title">Physical keyboard reconnected</string>
     <string name="notification_keyboard_text">Tap to switch back to AltShift.</string>
     <string name="notification_switch_back">Switch back</string>
+
+    <string name="ime_fallback_message">Physical keyboard disconnected. Switch to an on-screen keyboard.</string>
+    <string name="ime_fallback_action">Switch keyboard</string>
 
     <string name="language_section_title">Language switch</string>
     <string name="language_shortcut_label">Shortcut</string>
