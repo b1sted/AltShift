@@ -4,12 +4,41 @@
     <string name="ime_name">AltShift</string>
     <string name="ime_subtype_label">AltShift hardware keyboard</string>
 
-    <string name="ime_status_title">Input method status</string>
-    <string name="ime_status_active">AltShift is the active input method.</string>
-    <string name="ime_status_enabled_not_selected">AltShift is enabled but not selected. Choose it as the current keyboard.</string>
-    <string name="ime_status_enabled_verify">AltShift is enabled. Open keyboard settings to confirm it is selected as the current keyboard.</string>
-    <string name="ime_status_disabled">AltShift is not enabled. Enable it in system settings to use hardware shortcuts.</string>
-    <string name="open_ime_settings">Open keyboard settings</string>
+    <string name="setup_title">Setup</string>
+    <string name="setup_subtitle">Complete these steps to activate AltShift.</string>
+    <string name="step_number_one">1</string>
+    <string name="step_number_two">2</string>
+    <string name="step_number_three">3</string>
+    <string name="check_mark">✓</string>
+    <string name="setup_done">Completed</string>
+
+    <string name="setup_step_enable_title">Enable input method</string>
+    <string name="setup_step_enable_ok">AltShift is enabled.</string>
+    <string name="setup_step_enable_pending">AltShift is not enabled in system settings.</string>
+    <string name="setup_step_enable_action">Enable in Settings</string>
+
+    <string name="setup_step_select_title">Select current input method</string>
+    <string name="setup_step_select_ok">AltShift is the active input method.</string>
+    <string name="setup_step_select_pending">AltShift is enabled but not active.</string>
+    <string name="setup_step_select_blocked">Enable AltShift in Step 1 first.</string>
+    <string name="setup_step_select_action">Select AltShift</string>
+
+    <string name="setup_step_overlay_title">Background and overlay permissions</string>
+    <string name="setup_step_overlay_explanation">Needed to launch apps from hotkeys without ZUI Association Launch prompts</string>
+    <string name="setup_step_overlay_action">Grant overlay permission</string>
+
+    <string name="keyboard_connected">Physical keyboard: connected</string>
+    <string name="keyboard_disconnected">Physical keyboard: disconnected</string>
+    <string name="open_keyboard_picker">Open keyboard picker</string>
+
+    <string name="ime_fallback_message">Physical keyboard disconnected. Switch to an on-screen keyboard.</string>
+    <string name="ime_fallback_action">Switch keyboard</string>
+
+    <string name="notification_channel_name">Keyboard state</string>
+    <string name="notification_channel_description">Prompts when a physical keyboard is reconnected.</string>
+    <string name="notification_keyboard_title">Physical keyboard reconnected</string>
+    <string name="notification_keyboard_text">Tap to switch back to AltShift.</string>
+    <string name="notification_switch_back">Switch back</string>
 
     <string name="language_section_title">Language switch</string>
     <string name="language_shortcut_label">Shortcut</string>
@@ -36,4 +65,6 @@
     <string name="shortcut_deleted">Shortcut deleted.</string>
     <string name="shortcut_save_failed">Unable to save shortcut.</string>
     <string name="settings_open_failed">Unable to open keyboard settings.</string>
+    <string name="overlay_settings_failed">Unable to open overlay settings.</string>
+    <string name="ime_picker_failed">Unable to open the keyboard picker.</string>
 </resources>
