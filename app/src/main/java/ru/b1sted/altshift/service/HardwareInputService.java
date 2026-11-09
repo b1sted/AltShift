@@ -5,6 +5,10 @@ import android.content.res.Configuration;
 import android.hardware.input.InputManager;
 import android.inputmethodservice.InputMethodService;
 import android.os.Build;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -14,6 +18,7 @@ import android.view.inputmethod.InputMethodManager;
 
 import java.util.Objects;
 
+import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ViewImeFallbackBinding;
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
@@ -22,6 +27,7 @@ import ru.b1sted.altshift.storage.HotkeyRepository;
 public final class HardwareInputService extends InputMethodService {
 
     private static final String TAG = "AltShift";
+    private static final String INPUT_THREAD_NAME = "AltShift-Input";
 
     private final InputManager.InputDeviceListener deviceListener =
             new InputManager.InputDeviceListener() {
@@ -41,13 +47,22 @@ public final class HardwareInputService extends InputMethodService {
                 }
             };
 
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable keyboardCheckTask = this::handleKeyboardStateChange;
+    private final Runnable refreshInputViewTask = this::refreshInputView;
+
     private volatile HotkeyBinding[] bindings = new HotkeyBinding[0];
     private volatile LanguageSwitchShortcut languageShortcut = LanguageSwitchShortcut.DEFAULT;
+    private volatile boolean keyboardPresent;
+    private volatile boolean alternativeImeAvailable = true;
+    private volatile boolean shuttingDown;
 
     private HotkeyRepository repository;
     private InputManager inputManager;
+    private HandlerThread inputThread;
+    private Handler inputHandler;
+    private ViewImeFallbackBinding fallbackBinding;
     private boolean isRussian;
-    private boolean keyboardPresent;
     private boolean listenerRegistered;
 
     @Override
@@ -60,11 +75,17 @@ public final class HardwareInputService extends InputMethodService {
         repository = Objects.requireNonNull(
                 HotkeyRepository.getInstance(this), "repository");
         reloadConfiguration();
+        postKeyboardCheck();
     }
 
     @Override
     public void onDestroy() {
+        shuttingDown = true;
+
         unregisterDeviceListener();
+        stopInputThread();
+        mainHandler.removeCallbacksAndMessages(null);
+        fallbackBinding = null;
 
         super.onDestroy();
     }
@@ -73,7 +94,7 @@ public final class HardwareInputService extends InputMethodService {
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
 
-        handleKeyboardStateChange();
+        postKeyboardCheck();
     }
 
     @Override
@@ -81,17 +102,20 @@ public final class HardwareInputService extends InputMethodService {
         super.onStartInput(attribute, restarting);
 
         reloadConfiguration();
+        postKeyboardCheck();
     }
 
     @Override
     public View onCreateInputView() {
-        ViewImeFallbackBinding viewBinding =
-                ViewImeFallbackBinding.inflate(getLayoutInflater());
-
-        viewBinding.switchKeyboardButton.setOnClickListener(
+        fallbackBinding = ViewImeFallbackBinding.inflate(getLayoutInflater());
+        fallbackBinding.switchKeyboardButton.setOnClickListener(
                 view -> switchToSoftKeyboard(true));
+        fallbackBinding.openKeyboardSettingsButton.setOnClickListener(
+                view -> openKeyboardSettings());
 
-        return viewBinding.getRoot();
+        applyFallbackState();
+
+        return fallbackBinding.getRoot();
     }
 
     @Override
@@ -145,15 +169,56 @@ public final class HardwareInputService extends InputMethodService {
         return super.onKeyDown(keyCode, event);
     }
 
-    private void handleKeyboardStateChange() {
-        boolean present = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this);
+    private void postKeyboardCheck() {
+        Handler handler = inputHandler;
+        if (handler == null) {
+            return;
+        }
 
-        if (present != keyboardPresent) {
+        handler.post(keyboardCheckTask);
+    }
+
+    private void handleKeyboardStateChange() {
+        if (shuttingDown) {
+            return;
+        }
+
+        boolean present = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this);
+        boolean alternative = InputMethodSwitcher.hasAlternativeInputMethod(this);
+        boolean changed = present != keyboardPresent;
+
+        alternativeImeAvailable = alternative;
+        if (changed) {
             keyboardPresent = present;
             updateKeyboardState(present);
         }
 
+        mainHandler.post(refreshInputViewTask);
+    }
+
+    private void refreshInputView() {
+        if (shuttingDown) {
+            return;
+        }
+
         updateInputViewShown();
+        applyFallbackState();
+    }
+
+    private void applyFallbackState() {
+        ViewImeFallbackBinding local = fallbackBinding;
+        if (local == null) {
+            return;
+        }
+
+        boolean stranded = !keyboardPresent && !alternativeImeAvailable;
+
+        local.fallbackMessage.setText(stranded
+                ? R.string.ime_fallback_no_keyboard_message
+                : R.string.ime_fallback_message);
+        local.switchKeyboardButton.setVisibility(stranded ? View.GONE : View.VISIBLE);
+        local.openKeyboardSettingsButton.setVisibility(
+                stranded ? View.VISIBLE : View.GONE);
     }
 
     private void updateKeyboardState(boolean present) {
@@ -168,6 +233,10 @@ public final class HardwareInputService extends InputMethodService {
                 KeyboardNotification.showReconnected(this);
             }
 
+            return;
+        }
+
+        if (!alternativeImeAvailable) {
             return;
         }
 
@@ -189,6 +258,12 @@ public final class HardwareInputService extends InputMethodService {
     }
 
     private void switchToSoftKeyboard(boolean showPickerOnFailure) {
+        if (!alternativeImeAvailable) {
+            openKeyboardSettings();
+
+            return;
+        }
+
         try {
             if (switchToAvailableInputMethod()) {
                 return;
@@ -223,18 +298,33 @@ public final class HardwareInputService extends InputMethodService {
         manager.showInputMethodPicker();
     }
 
+    private void openKeyboardSettings() {
+        Intent intent = new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        try {
+            startActivity(intent);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to open keyboard settings", exception);
+        }
+    }
+
     private boolean isActiveInputMethod() {
         return InputMethodSwitcher.isAltShiftActive(this);
     }
 
     private void registerDeviceListener() {
         try {
+            inputThread = new HandlerThread(INPUT_THREAD_NAME);
+            inputThread.start();
+            inputHandler = new Handler(inputThread.getLooper());
+
             inputManager = getSystemService(InputManager.class);
             if (inputManager == null) {
                 return;
             }
 
-            inputManager.registerInputDeviceListener(deviceListener, null);
+            inputManager.registerInputDeviceListener(deviceListener, inputHandler);
             listenerRegistered = true;
         } catch (RuntimeException exception) {
             Log.e(TAG, "Unable to register input device listener", exception);
@@ -258,6 +348,18 @@ public final class HardwareInputService extends InputMethodService {
         } finally {
             inputManager = null;
         }
+    }
+
+    private void stopInputThread() {
+        HandlerThread thread = inputThread;
+        inputThread = null;
+        inputHandler = null;
+
+        if (thread == null) {
+            return;
+        }
+
+        thread.quitSafely();
     }
 
     private void reloadConfiguration() {
