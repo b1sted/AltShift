@@ -24,6 +24,10 @@ public final class KeyboardPresenceMonitor {
         try {
             final Configuration configuration =
                     context.getResources().getConfiguration();
+            if (configuration.hardKeyboardHidden
+                    == Configuration.HARDKEYBOARDHIDDEN_YES) {
+                return false;
+            }
             final boolean reported = configuration.keyboard != Configuration.KEYBOARD_NOKEYS
                     && configuration.hardKeyboardHidden
                     == Configuration.HARDKEYBOARDHIDDEN_NO;

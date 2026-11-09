@@ -80,6 +80,10 @@ public final class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         openPickerOnResume = intent.getBooleanExtra(EXTRA_OPEN_IME_PICKER, false);
+        if (openPickerOnResume) {
+            openPickerOnResume = false;
+            showImePicker();
+        }
     }
 
     private void refreshAll() {
@@ -201,9 +205,14 @@ public final class MainActivity extends AppCompatActivity {
             startActivity(new Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + getPackageName())));
-        } catch (final RuntimeException exception) {
-            Log.e(TAG, "Unable to open overlay settings", exception);
-            toast(R.string.overlay_settings_failed);
+        } catch (final RuntimeException first) {
+            Log.e(TAG, "Unable to open overlay settings", first);
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
+            } catch (final RuntimeException second) {
+                Log.e(TAG, "Unable to open generic overlay settings", second);
+                toast(R.string.overlay_settings_failed);
+            }
         }
     }
 
