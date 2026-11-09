@@ -7,7 +7,6 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Icon;
-import android.os.Build;
 import android.util.Log;
 
 import ru.b1sted.altshift.R;
@@ -69,9 +68,6 @@ public final class KeyboardNotification {
 
     private static void ensureChannel(
             final Context context, final NotificationManager manager) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            return;
-        }
         final NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 context.getString(R.string.notification_channel_name),

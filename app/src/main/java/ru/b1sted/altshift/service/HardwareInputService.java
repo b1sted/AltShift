@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.hardware.input.InputManager;
 import android.inputmethodservice.InputMethodService;
+import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -143,8 +144,13 @@ public final class HardwareInputService extends InputMethodService {
 
     private void switchToSoftKeyboard(final boolean showPickerOnFailure) {
         try {
-            if (switchToPreviousInputMethod()) {
-                return;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                if (switchToPreviousInputMethod()) {
+                    return;
+                }
+                if (switchToNextInputMethod(false)) {
+                    return;
+                }
             }
             if (showPickerOnFailure) {
                 final InputMethodManager manager =
