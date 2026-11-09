@@ -2,22 +2,19 @@ package ru.b1sted.altshift.ui;
 
 import android.content.ComponentName;
 import android.content.Intent;
-import android.net.Uri;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
-import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
-import java.util.List;
 import java.util.Objects;
 
 import ru.b1sted.altshift.R;
@@ -44,32 +41,39 @@ public final class MainActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        repository = Objects.requireNonNull(
+                HotkeyRepository.getInstance(this), "repository");
+        if (!repository.isOnboardingCompleted()) {
+            openOnboarding();
+
+            return;
+        }
+
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         setSupportActionBar(binding.toolbar);
 
-        repository = Objects.requireNonNull(
-                HotkeyRepository.getInstance(this), "repository");
         adapter = new HotkeyAdapter(this, this::deleteBinding);
-
         binding.hotkeyList.setLayoutManager(new LinearLayoutManager(this));
         binding.hotkeyList.setAdapter(adapter);
 
-        binding.step1Button.setOnClickListener(view -> openImeSettings());
-        binding.step2Button.setOnClickListener(view -> showImePicker());
-        binding.step3Button.setOnClickListener(view -> openOverlaySettings());
-        binding.keyboardFallbackButton.setOnClickListener(view -> showImePicker());
         binding.languageShortcutButton.setOnClickListener(
                 view -> captureLanguageShortcut());
         binding.addHotkeyFab.setOnClickListener(view -> addHotkey());
 
-        openPickerOnResume = getIntent().getBooleanExtra(EXTRA_OPEN_IME_PICKER, false);
+        openPickerOnResume = getIntent().getBooleanExtra(
+                EXTRA_OPEN_IME_PICKER, false);
         refreshAll();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+
+        if (binding == null) {
+            return;
+        }
+
         refreshAll();
 
         if (openPickerOnResume) {
@@ -99,113 +103,55 @@ public final class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
+    private void openOnboarding() {
+        Intent intent = new Intent(this, OnboardingActivity.class);
+        startActivity(intent);
+        finish();
+    }
+
     private void refreshAll() {
-        refreshSetup();
+        refreshStatus();
         refreshLanguageShortcut();
         refreshHotkeys();
     }
 
-    private void refreshSetup() {
-        ComponentName component =
-                new ComponentName(this, HardwareInputService.class);
-        boolean isEnabled = isImeEnabled(component);
-        String active = readSecureSetting(Settings.Secure.DEFAULT_INPUT_METHOD);
-        boolean isActiveKnown = active != null;
-        boolean isActive = isActiveKnown && matchesComponent(active, component);
-        boolean hasOverlay = Settings.canDrawOverlays(this);
-
-        bindStep(binding.step1Check, binding.step1Status, binding.step1Button,
-                isEnabled, R.string.setup_step_enable_ok,
-                R.string.setup_step_enable_pending);
-        bindStep(binding.step2Check, binding.step2Status, binding.step2Button,
-                isActive, R.string.setup_step_select_ok,
-                isEnabled ? R.string.setup_step_select_pending
-                        : R.string.setup_step_select_blocked);
-        bindOverlayStep(hasOverlay);
-
-        boolean hasKeyboard = KeyboardPresenceMonitor
+    private void refreshStatus() {
+        boolean keyboardPresent = KeyboardPresenceMonitor
                 .isPhysicalKeyboardAvailable(this);
-        binding.keyboardStateText.setText(hasKeyboard
-                ? R.string.keyboard_connected : R.string.keyboard_disconnected);
-        binding.keyboardStateText.setTextColor(getColor(hasKeyboard
-                ? R.color.brand_success : R.color.brand_error));
-        binding.keyboardFallbackButton.setVisibility(
-                hasKeyboard ? View.GONE : View.VISIBLE);
+        boolean imeActive = isAltShiftActive();
+
+        String keyboardStatus = getString(keyboardPresent
+                ? R.string.status_keyboard_connected
+                : R.string.status_keyboard_disconnected);
+        String imeStatus = getString(imeActive
+                ? R.string.status_ime_active
+                : R.string.status_ime_inactive);
+        binding.statusText.setText(getString(
+                R.string.status_badge_format, keyboardStatus, imeStatus));
+
+        int dotColor = getColor(keyboardPresent && imeActive
+                ? R.color.brand_success
+                : R.color.brand_error);
+        binding.statusDot.setBackgroundTintList(ColorStateList.valueOf(dotColor));
     }
 
-    private void bindStep(
-            TextView check,
-            TextView status,
-            View action,
-            boolean done,
-            int doneResId,
-            int pendingResId) {
-        status.setText(done ? doneResId : pendingResId);
-        status.setTextColor(getColor(done ? R.color.brand_success : R.color.brand_error));
-        check.setVisibility(done ? View.VISIBLE : View.GONE);
-        action.setVisibility(done ? View.GONE : View.VISIBLE);
-    }
-
-    private void bindOverlayStep(boolean granted) {
-        binding.step3Status.setText(R.string.setup_step_overlay_explanation);
-        binding.step3Check.setVisibility(granted ? View.VISIBLE : View.GONE);
-        binding.step3Button.setVisibility(granted ? View.GONE : View.VISIBLE);
-    }
-
-    private boolean isImeEnabled(ComponentName component) {
-        List<InputMethodInfo> methods = readEnabledInputMethods();
-        if (methods == null) {
-            return false;
-        }
-
-        for (int index = 0; index < methods.size(); index++) {
-            if (component.equals(methods.get(index).getComponent())) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    @Nullable
-    private List<InputMethodInfo> readEnabledInputMethods() {
+    private boolean isAltShiftActive() {
         try {
-            InputMethodManager manager = getSystemService(InputMethodManager.class);
-            if (manager == null) {
-                return null;
+            String active = Settings.Secure.getString(
+                    getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+            if (TextUtils.isEmpty(active)) {
+                return false;
             }
 
-            return manager.getEnabledInputMethodList();
+            ComponentName component = new ComponentName(this, HardwareInputService.class);
+
+            return active.contains(component.flattenToString())
+                    || active.contains(component.flattenToShortString());
         } catch (RuntimeException exception) {
-            Log.e(TAG, "Unable to query enabled input methods", exception);
+            Log.w(TAG, "Unable to read the active input method", exception);
 
-            return null;
-        }
-    }
-
-    @Nullable
-    private String readSecureSetting(String key) {
-        try {
-            return Settings.Secure.getString(getContentResolver(), key);
-        } catch (SecurityException exception) {
-            Log.w(TAG, "Secure setting is restricted: " + key, exception);
-
-            return null;
-        } catch (RuntimeException exception) {
-            Log.e(TAG, "Unable to read secure setting: " + key, exception);
-
-            return null;
-        }
-    }
-
-    private static boolean matchesComponent(
-            String flat, ComponentName component) {
-        if (TextUtils.isEmpty(flat) || component == null) {
             return false;
         }
-
-        return flat.contains(component.flattenToString())
-                || flat.contains(component.flattenToShortString());
     }
 
     private void refreshLanguageShortcut() {
@@ -218,41 +164,6 @@ public final class MainActivity extends AppCompatActivity {
         adapter.submit(bindings);
         binding.emptyView.setVisibility(
                 bindings.length == 0 ? View.VISIBLE : View.GONE);
-    }
-
-    private void openImeSettings() {
-        Intent intent = new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS);
-
-        if (!tryStartActivity(intent)) {
-            toast(R.string.settings_open_failed);
-        }
-    }
-
-    private void openOverlaySettings() {
-        Intent packageIntent = new Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:" + getPackageName()));
-
-        if (tryStartActivity(packageIntent)) {
-            return;
-        }
-
-        Intent genericIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
-        if (!tryStartActivity(genericIntent)) {
-            toast(R.string.overlay_settings_failed);
-        }
-    }
-
-    private boolean tryStartActivity(Intent intent) {
-        try {
-            startActivity(intent);
-
-            return true;
-        } catch (RuntimeException exception) {
-            Log.w(TAG, "Cannot resolve activity for intent: " + intent, exception);
-
-            return false;
-        }
     }
 
     private void showImePicker() {

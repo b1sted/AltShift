@@ -34,6 +34,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.OnboardingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AltShift" />
+
         <service
             android:name=".service.HardwareInputService"
             android:exported="true"

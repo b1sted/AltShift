@@ -21,6 +21,7 @@ public final class HotkeyRepository {
     private static final String PREFS_NAME = "altshift_prefs";
     private static final String KEY_HOTKEYS = "hotkeys";
     private static final String KEY_LANGUAGE_SHORTCUT = "language_shortcut";
+    private static final String KEY_ONBOARDING_COMPLETED = "onboarding_completed";
     private static final HotkeyBinding[] EMPTY_BINDINGS = new HotkeyBinding[0];
 
     private static volatile HotkeyRepository instance;
@@ -30,6 +31,7 @@ public final class HotkeyRepository {
 
     private volatile HotkeyBinding[] bindings;
     private volatile LanguageSwitchShortcut languageShortcut;
+    private volatile boolean onboardingCompleted;
 
     private HotkeyRepository(Context context) {
         preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -37,6 +39,7 @@ public final class HotkeyRepository {
         bindings = readBindings(preferences.getString(KEY_HOTKEYS, null));
         languageShortcut = readLanguageShortcut(
                 preferences.getString(KEY_LANGUAGE_SHORTCUT, null));
+        onboardingCompleted = preferences.getBoolean(KEY_ONBOARDING_COMPLETED, false);
     }
 
     public static HotkeyRepository getInstance(Context context) {
@@ -65,6 +68,19 @@ public final class HotkeyRepository {
 
     public LanguageSwitchShortcut getLanguageShortcut() {
         return languageShortcut;
+    }
+
+    public boolean isOnboardingCompleted() {
+        return onboardingCompleted;
+    }
+
+    public void setOnboardingCompleted(boolean completed) {
+        synchronized (lock) {
+            preferences.edit()
+                    .putBoolean(KEY_ONBOARDING_COMPLETED, completed)
+                    .apply();
+            onboardingCompleted = completed;
+        }
     }
 
     public void saveBinding(HotkeyBinding binding) {
