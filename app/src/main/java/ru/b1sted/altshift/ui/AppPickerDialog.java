@@ -1,18 +1,23 @@
 package ru.b1sted.altshift.ui;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
-import android.widget.ImageView;
-import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -21,8 +26,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import ru.b1sted.altshift.R;
+import ru.b1sted.altshift.databinding.DialogAppPickerBinding;
+import ru.b1sted.altshift.databinding.ItemAppPickerBinding;
 
 public final class AppPickerDialog {
 
@@ -32,85 +41,146 @@ public final class AppPickerDialog {
         void onSelected(String appName, String packageName);
     }
 
+    private interface AppClickListener {
+        void onAppClicked(AppEntry entry);
+    }
+
     private AppPickerDialog() {
     }
 
-    public static void show(final Context context, final Listener listener) {
+    public static void show(Context context, Listener listener) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(listener, "listener");
 
-        final List<AppEntry> apps;
-        try {
-            apps = loadLaunchableApps(context);
-        } catch (final RuntimeException exception) {
-            Log.e(TAG, "Unable to query launchable applications", exception);
-            new MaterialAlertDialogBuilder(context)
-                    .setTitle(R.string.select_app_title)
-                    .setMessage(R.string.app_picker_failed)
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show();
-            return;
-        }
-
-        if (apps.isEmpty()) {
-            new MaterialAlertDialogBuilder(context)
-                    .setTitle(R.string.select_app_title)
-                    .setMessage(R.string.no_launchable_apps)
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show();
-            return;
-        }
-
-        final AppListAdapter adapter = new AppListAdapter(context, apps);
-        new MaterialAlertDialogBuilder(context)
+        DialogAppPickerBinding binding =
+                DialogAppPickerBinding.inflate(LayoutInflater.from(context));
+        AlertDialog dialog = new MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.select_app_title)
-                .setAdapter(adapter, (dialog, which) -> {
-                    final AppEntry entry = apps.get(which);
-                    listener.onSelected(entry.label(), entry.packageName());
-                })
+                .setView(binding.getRoot())
                 .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                .create();
+
+        AppListAdapter adapter = new AppListAdapter(entry -> {
+            listener.onSelected(entry.label(), entry.packageName());
+            dialog.dismiss();
+        });
+
+        binding.appList.setLayoutManager(new LinearLayoutManager(context));
+        binding.appList.setAdapter(adapter);
+        binding.progress.setVisibility(View.VISIBLE);
+        binding.emptyView.setVisibility(View.GONE);
+
+        dialog.show();
+
+        loadAppsAsync(context, dialog, binding, adapter);
     }
 
-    private static List<AppEntry> loadLaunchableApps(final Context context) {
-        final PackageManager packageManager = context.getPackageManager();
-        final Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
+    private static void loadAppsAsync(
+            Context context,
+            AlertDialog dialog,
+            DialogAppPickerBinding binding,
+            AppListAdapter adapter) {
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        executor.execute(() -> {
+            try {
+                List<AppEntry> apps = loadLaunchableApps(context);
+
+                mainHandler.post(() -> publishApps(dialog, binding, adapter, apps));
+            } catch (RuntimeException exception) {
+                Log.e(TAG, "Unable to query launchable applications", exception);
+
+                mainHandler.post(() -> showEmptyState(
+                        dialog, binding, R.string.app_picker_failed));
+            } finally {
+                executor.shutdown();
+            }
+        });
+    }
+
+    private static void publishApps(
+            AlertDialog dialog,
+            DialogAppPickerBinding binding,
+            AppListAdapter adapter,
+            List<AppEntry> apps) {
+        if (!dialog.isShowing()) {
+            return;
+        }
+
+        binding.progress.setVisibility(View.GONE);
+
+        if (apps.isEmpty()) {
+            showEmptyState(dialog, binding, R.string.no_launchable_apps);
+
+            return;
+        }
+
+        adapter.submit(apps);
+        binding.appList.setVisibility(View.VISIBLE);
+    }
+
+    private static void showEmptyState(
+            AlertDialog dialog, DialogAppPickerBinding binding, int messageResId) {
+        if (!dialog.isShowing()) {
+            return;
+        }
+
+        binding.progress.setVisibility(View.GONE);
+        binding.appList.setVisibility(View.GONE);
+        binding.emptyView.setText(messageResId);
+        binding.emptyView.setVisibility(View.VISIBLE);
+    }
+
+    private static List<AppEntry> loadLaunchableApps(Context context) {
+        PackageManager packageManager = context.getPackageManager();
+        Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
         launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-        final List<ResolveInfo> resolved =
+
+        List<ResolveInfo> resolved =
                 packageManager.queryIntentActivities(launcherIntent, 0);
-        final List<AppEntry> apps = new ArrayList<>(resolved.size());
-        final Set<String> seen = new HashSet<>();
-        final String ownPackage = context.getPackageName();
+        List<AppEntry> apps = new ArrayList<>(resolved.size());
+        Set<String> seen = new HashSet<>();
+        String ownPackage = context.getPackageName();
 
         for (int index = 0; index < resolved.size(); index++) {
-            final ResolveInfo info = resolved.get(index);
+            ResolveInfo info = resolved.get(index);
             if (info.activityInfo == null) {
                 continue;
             }
-            final String packageName = info.activityInfo.packageName;
+
+            String packageName = info.activityInfo.packageName;
             if (packageName == null
                     || packageName.equals(ownPackage)
                     || !seen.add(packageName)) {
                 continue;
             }
-            final ApplicationInfo applicationInfo = info.activityInfo.applicationInfo;
+
+            ApplicationInfo applicationInfo = info.activityInfo.applicationInfo;
             CharSequence label = applicationInfo == null
                     ? packageName
                     : packageManager.getApplicationLabel(applicationInfo);
             if (label == null || label.length() == 0) {
                 label = packageName;
             }
-            Drawable icon = null;
-            try {
-                icon = packageManager.getApplicationIcon(packageName);
-            } catch (final PackageManager.NameNotFoundException | RuntimeException exception) {
-                Log.w(TAG, "Unable to load icon for " + packageName, exception);
-            }
+
+            Drawable icon = loadIcon(packageManager, packageName);
             apps.add(new AppEntry(label.toString(), packageName, icon));
         }
 
         apps.sort((left, right) -> left.label().compareToIgnoreCase(right.label()));
+
         return apps;
+    }
+
+    private static Drawable loadIcon(PackageManager packageManager, String packageName) {
+        try {
+            return packageManager.getApplicationIcon(packageName);
+        } catch (PackageManager.NameNotFoundException | RuntimeException exception) {
+            Log.w(TAG, "Unable to load icon for " + packageName, exception);
+
+            return null;
+        }
     }
 
     private record AppEntry(String label, String packageName, Drawable icon) {
@@ -120,68 +190,62 @@ public final class AppPickerDialog {
         }
     }
 
-    private static final class AppListAdapter extends BaseAdapter {
+    private static final class AppListAdapter extends RecyclerView.Adapter<AppViewHolder> {
 
-        private final LayoutInflater inflater;
-        private final List<AppEntry> items;
+        private final List<AppEntry> items = new ArrayList<>();
+        private final AppClickListener clickListener;
 
-        private AppListAdapter(final Context context, final List<AppEntry> items) {
-            inflater = LayoutInflater.from(context);
-            this.items = items;
+        private AppListAdapter(AppClickListener clickListener) {
+            this.clickListener = clickListener;
+        }
+
+        @SuppressLint("NotifyDataSetChanged")
+        void submit(List<AppEntry> apps) {
+            items.clear();
+            items.addAll(apps);
+
+            notifyDataSetChanged();
+        }
+
+        @NonNull
+        @Override
+        public AppViewHolder onCreateViewHolder(
+                @NonNull ViewGroup parent, int viewType) {
+            ItemAppPickerBinding binding = ItemAppPickerBinding.inflate(
+                    LayoutInflater.from(parent.getContext()), parent, false);
+
+            return new AppViewHolder(binding);
         }
 
         @Override
-        public int getCount() {
-            return items.size();
-        }
+        public void onBindViewHolder(
+                @NonNull AppViewHolder holder, int position) {
+            AppEntry entry = items.get(position);
 
-        @Override
-        public AppEntry getItem(final int position) {
-            return items.get(position);
-        }
-
-        @Override
-        public long getItemId(final int position) {
-            return position;
-        }
-
-        @Override
-        public View getView(
-                final int position,
-                final View convertView,
-                final ViewGroup parent) {
-            final View view;
-            final ViewHolder holder;
-            if (convertView == null) {
-                view = inflater.inflate(R.layout.item_app_picker, parent, false);
-                holder = new ViewHolder(view);
-                view.setTag(holder);
-            } else {
-                view = convertView;
-                holder = (ViewHolder) view.getTag();
-            }
-            final AppEntry entry = getItem(position);
-            holder.label.setText(entry.label());
-            holder.packageName.setText(entry.packageName());
+            holder.binding.appLabel.setText(entry.label());
+            holder.binding.appPackage.setText(entry.packageName());
             if (entry.icon() == null) {
-                holder.icon.setImageResource(android.R.drawable.sym_def_app_icon);
+                holder.binding.appIcon.setImageResource(android.R.drawable.sym_def_app_icon);
             } else {
-                holder.icon.setImageDrawable(entry.icon());
+                holder.binding.appIcon.setImageDrawable(entry.icon());
             }
-            return view;
+
+            holder.itemView.setOnClickListener(view -> clickListener.onAppClicked(entry));
+        }
+
+        @Override
+        public int getItemCount() {
+            return items.size();
         }
     }
 
-    private static final class ViewHolder {
+    private static final class AppViewHolder extends RecyclerView.ViewHolder {
 
-        private final ImageView icon;
-        private final TextView label;
-        private final TextView packageName;
+        private final ItemAppPickerBinding binding;
 
-        private ViewHolder(final View view) {
-            icon = view.findViewById(R.id.appIcon);
-            label = view.findViewById(R.id.appLabel);
-            packageName = view.findViewById(R.id.appPackage);
+        private AppViewHolder(ItemAppPickerBinding binding) {
+            super(binding.getRoot());
+            this.binding = binding;
         }
     }
 }

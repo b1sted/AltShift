@@ -19,11 +19,11 @@ public record LanguageSwitchShortcut(
     }
 
     public boolean matches(
-            final int candidateKeyCode,
-            final boolean ctrl,
-            final boolean alt,
-            final boolean shift,
-            final boolean meta) {
+            int candidateKeyCode,
+            boolean ctrl,
+            boolean alt,
+            boolean shift,
+            boolean meta) {
         return KeyMatcher.matches(
                 keyCode,
                 isCtrl,
