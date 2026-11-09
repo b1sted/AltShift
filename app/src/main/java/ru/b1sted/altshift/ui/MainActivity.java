@@ -6,8 +6,12 @@ import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.database.ContentObserver;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -45,6 +49,7 @@ public final class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
     private HotkeyRepository repository;
     private HotkeyAdapter adapter;
+    private ContentObserver imeObserver;
     private boolean openPickerOnResume;
     private boolean autoSwitchHintExpanded;
 
@@ -77,10 +82,13 @@ public final class MainActivity extends AppCompatActivity {
                 view -> toggleAutoSwitchHint());
         binding.copyCommandButton.setOnClickListener(
                 view -> copyAutoSwitchCommand());
+        binding.developerOptionsButton.setOnClickListener(
+                view -> openDeveloperOptions());
         binding.themeButton.setOnClickListener(view -> showThemeDialog());
 
         openPickerOnResume = getIntent().getBooleanExtra(
                 EXTRA_OPEN_IME_PICKER, false);
+        registerImeObserver();
         refreshAll();
         requestNotificationPermissionIfNeeded();
     }
@@ -127,11 +135,46 @@ public final class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        unregisterImeObserver();
+
         if (adapter != null) {
             adapter.shutdown();
         }
 
         super.onDestroy();
+    }
+
+    private void registerImeObserver() {
+        imeObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
+            @Override
+            public void onChange(boolean selfChange) {
+                refreshStatus();
+            }
+        };
+
+        try {
+            getContentResolver().registerContentObserver(
+                    Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
+                    false,
+                    imeObserver);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to observe the active input method", exception);
+        }
+    }
+
+    private void unregisterImeObserver() {
+        ContentObserver observer = imeObserver;
+        imeObserver = null;
+
+        if (observer == null) {
+            return;
+        }
+
+        try {
+            getContentResolver().unregisterContentObserver(observer);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to stop observing the active input method", exception);
+        }
     }
 
     private void openOnboarding() {
@@ -235,6 +278,26 @@ public final class MainActivity extends AppCompatActivity {
                 getString(R.string.auto_switch_command));
         clipboard.setPrimaryClip(clip);
         toast(R.string.command_copied);
+    }
+
+    private void openDeveloperOptions() {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
+
+        if (!tryStartActivity(intent)) {
+            toast(R.string.settings_open_failed);
+        }
+    }
+
+    private boolean tryStartActivity(Intent intent) {
+        try {
+            startActivity(intent);
+
+            return true;
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Cannot resolve activity for intent: " + intent, exception);
+
+            return false;
+        }
     }
 
     private void requestNotificationPermissionIfNeeded() {

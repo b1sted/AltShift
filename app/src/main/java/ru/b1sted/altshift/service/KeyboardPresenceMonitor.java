@@ -65,6 +65,10 @@ public final class KeyboardPresenceMonitor {
             return false;
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && !device.isEnabled()) {
+            return false;
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             return device.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC;
         }

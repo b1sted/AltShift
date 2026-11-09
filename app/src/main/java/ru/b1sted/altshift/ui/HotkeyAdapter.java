@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.util.LruCache;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
@@ -14,10 +15,8 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,7 +38,7 @@ public final class HotkeyAdapter
     private final PackageManager packageManager;
     private final OnDeleteListener deleteListener;
     private final List<HotkeyBinding> items = new ArrayList<>();
-    private final Map<String, Drawable> iconCache = new HashMap<>();
+    private final LruCache<String, Drawable> iconCache = new LruCache<>(32);
     private final Set<String> pendingIcons = new HashSet<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService iconExecutor = Executors.newFixedThreadPool(2, runnable -> {

@@ -91,6 +91,30 @@ public final class InputMethodSwitcher {
         return setDefaultInputMethod(context, ALTSHIFT_IME_ID);
     }
 
+    /**
+     * Returns true when at least one enabled input method is not AltShift.
+     * Without such a method, detaching the hardware keyboard would leave the user
+     * with no way to type on screen.
+     */
+    public static boolean hasAlternativeInputMethod(Context context) {
+        if (context == null) {
+            return false;
+        }
+
+        List<InputMethodInfo> methods = readEnabledInputMethods(context);
+        if (methods == null) {
+            return false;
+        }
+
+        for (int index = 0; index < methods.size(); index++) {
+            if (!isAltShiftId(methods.get(index).getId())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static boolean isAltShiftEnabled(Context context) {
         List<InputMethodInfo> methods = readEnabledInputMethods(context);
         if (methods == null) {
