@@ -1,14 +1,21 @@
 package ru.b1sted.altshift.service;
 
+import android.content.ComponentName;
 import android.content.Intent;
+import android.content.res.Configuration;
+import android.hardware.input.InputManager;
 import android.inputmethodservice.InputMethodService;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputMethodManager;
 
 import java.util.Objects;
 
+import ru.b1sted.altshift.databinding.ViewImeFallbackBinding;
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
 import ru.b1sted.altshift.storage.HotkeyRepository;
@@ -17,18 +24,53 @@ public final class HardwareInputService extends InputMethodService {
 
     private static final String TAG = "AltShift";
 
+    private final InputManager.InputDeviceListener deviceListener =
+            new InputManager.InputDeviceListener() {
+                @Override
+                public void onInputDeviceAdded(final int deviceId) {
+                    handleKeyboardStateChange();
+                }
+
+                @Override
+                public void onInputDeviceRemoved(final int deviceId) {
+                    handleKeyboardStateChange();
+                }
+
+                @Override
+                public void onInputDeviceChanged(final int deviceId) {
+                    handleKeyboardStateChange();
+                }
+            };
+
     private volatile HotkeyBinding[] bindings = new HotkeyBinding[0];
     private volatile LanguageSwitchShortcut languageShortcut = LanguageSwitchShortcut.DEFAULT;
 
     private HotkeyRepository repository;
+    private InputManager inputManager;
     private boolean isRussian;
+    private boolean keyboardPresent;
+    private boolean listenerRegistered;
 
     @Override
     public void onCreate() {
         super.onCreate();
+        keyboardPresent = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this);
+        registerDeviceListener();
         repository = Objects.requireNonNull(
                 HotkeyRepository.getInstance(this), "repository");
         reloadConfiguration();
+    }
+
+    @Override
+    public void onDestroy() {
+        unregisterDeviceListener();
+        super.onDestroy();
+    }
+
+    @Override
+    public void onConfigurationChanged(final Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        handleKeyboardStateChange();
     }
 
     @Override
@@ -38,15 +80,26 @@ public final class HardwareInputService extends InputMethodService {
     }
 
     @Override
+    public View onCreateInputView() {
+        final ViewImeFallbackBinding viewBinding =
+                ViewImeFallbackBinding.inflate(getLayoutInflater());
+        viewBinding.switchKeyboardButton.setOnClickListener(
+                view -> switchToSoftKeyboard(true));
+        return viewBinding.getRoot();
+    }
+
+    @Override
     public boolean onEvaluateInputViewShown() {
         super.onEvaluateInputViewShown();
-        return false;
+        return !KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this);
     }
 
     @Override
     public boolean onShowInputRequested(final int flags, final boolean configChange) {
-        super.onShowInputRequested(flags, configChange);
-        return false;
+        if (KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this)) {
+            return false;
+        }
+        return super.onShowInputRequested(flags, configChange);
     }
 
     @Override
@@ -71,6 +124,85 @@ public final class HardwareInputService extends InputMethodService {
             }
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    private void handleKeyboardStateChange() {
+        final boolean present = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this);
+        if (present != keyboardPresent) {
+            keyboardPresent = present;
+            if (present) {
+                if (!isActiveInputMethod()) {
+                    KeyboardNotification.showReconnected(this);
+                }
+            } else {
+                switchToSoftKeyboard(false);
+            }
+        }
+        updateInputViewShown();
+    }
+
+    private void switchToSoftKeyboard(final boolean showPickerOnFailure) {
+        try {
+            if (switchToPreviousInputMethod()) {
+                return;
+            }
+            if (showPickerOnFailure) {
+                final InputMethodManager manager =
+                        getSystemService(InputMethodManager.class);
+                if (manager != null) {
+                    manager.showInputMethodPicker();
+                }
+            }
+        } catch (final RuntimeException exception) {
+            Log.w(TAG, "Unable to switch to the soft keyboard", exception);
+        }
+    }
+
+    private boolean isActiveInputMethod() {
+        try {
+            final String active = Settings.Secure.getString(
+                    getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+            if (active == null) {
+                return false;
+            }
+            final ComponentName component =
+                    new ComponentName(this, HardwareInputService.class);
+            return active.contains(component.flattenToString())
+                    || active.contains(component.flattenToShortString());
+        } catch (final RuntimeException exception) {
+            Log.w(TAG, "Unable to read the active input method", exception);
+            return false;
+        }
+    }
+
+    private void registerDeviceListener() {
+        try {
+            inputManager = getSystemService(InputManager.class);
+            if (inputManager == null) {
+                return;
+            }
+            inputManager.registerInputDeviceListener(deviceListener, null);
+            listenerRegistered = true;
+        } catch (final RuntimeException exception) {
+            Log.e(TAG, "Unable to register input device listener", exception);
+        }
+    }
+
+    private void unregisterDeviceListener() {
+        if (!listenerRegistered) {
+            return;
+        }
+        listenerRegistered = false;
+        try {
+            final InputManager manager = inputManager;
+            if (manager != null) {
+                manager.unregisterInputDeviceListener(deviceListener);
+            }
+        } catch (final RuntimeException exception) {
+            Log.w(TAG, "Unable to unregister input device listener", exception);
+        } finally {
+            inputManager = null;
+        }
     }
 
     private void reloadConfiguration() {

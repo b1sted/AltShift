@@ -31,6 +31,15 @@
     <string name="keyboard_disconnected">Physical keyboard: disconnected</string>
     <string name="open_keyboard_picker">Open keyboard picker</string>
 
+    <string name="ime_fallback_message">Physical keyboard disconnected. Switch to an on-screen keyboard.</string>
+    <string name="ime_fallback_action">Switch keyboard</string>
+
+    <string name="notification_channel_name">Keyboard state</string>
+    <string name="notification_channel_description">Prompts when a physical keyboard is reconnected.</string>
+    <string name="notification_keyboard_title">Physical keyboard reconnected</string>
+    <string name="notification_keyboard_text">Tap to switch back to AltShift.</string>
+    <string name="notification_switch_back">Switch back</string>
+
     <string name="language_section_title">Language switch</string>
     <string name="language_shortcut_label">Shortcut</string>
     <string name="change">Change</string>
