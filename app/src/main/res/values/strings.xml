@@ -35,8 +35,8 @@
     <string name="status_badge_format">%1$s · %2$s</string>
     <string name="status_keyboard_connected">Keyboard connected</string>
     <string name="status_keyboard_disconnected">Keyboard disconnected</string>
-    <string name="status_ime_active">AltShift active</string>
-    <string name="status_ime_inactive">AltShift inactive</string>
+    <string name="status_ime_active">IME active</string>
+    <string name="status_ime_inactive">IME inactive</string>
 
     <string name="theme_title">Theme</string>
     <string name="theme_system">System default</string>
