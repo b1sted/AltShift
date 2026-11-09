@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# AltShift - Local Release Build Script (Template)
+#
+# Usage:
+#   1. Copy this template:
+#      cp scripts/build-release.sh.example scripts/build-release.sh
+#      chmod +x scripts/build-release.sh
+#
+#   2. Adjust KEYSTORE_FILE and KEY_ALIAS below (or pass them via environment).
+#   3. Ensure scripts/build-release.sh is ignored in .gitignore!
+#
+
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+# Path to your release keystore (absolute path or relative to app/ directory)
+export KEYSTORE_FILE="${KEYSTORE_FILE:-$HOME/.android/keystores/altshift-release.jks}"
+export KEY_ALIAS="${KEY_ALIAS:-altshift}"
+
+if [ ! -f "$KEYSTORE_FILE" ]; then
+    echo "[-] Error: Keystore file not found at: $KEYSTORE_FILE" >&2
+    echo "    Please generate a keystore or set KEYSTORE_FILE to a valid path." >&2
+    exit 1
+fi
+
+# Fetch password from your password manager, or prompt interactively:
+# Example with 'pass': KEYSTORE_PASSWORD="$(pass show dev/altshift)"
+if [ -z "${KEYSTORE_PASSWORD:-}" ]; then
+    read -rsp "[?] Enter Keystore Password: " KEYSTORE_PASSWORD
+    echo
+fi
+
+export KEYSTORE_PASSWORD
+export KEY_PASSWORD="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+
+echo "[*] Building signed release APK..."
+./gradlew assembleRelease
+
+echo
+echo "[+] Build complete. Artifacts:"
+ls -lh app/build/outputs/apk/release/*.apk

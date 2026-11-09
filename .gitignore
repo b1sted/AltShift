@@ -28,3 +28,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local release script with credentials
+scripts/build-release.sh
