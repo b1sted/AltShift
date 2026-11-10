@@ -18,24 +18,30 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.Nullable;
 
+import ru.b1sted.altshift.service.InputMethodSwitcher;
+import ru.b1sted.altshift.service.KeyboardNotification;
+
 /**
- * Transparent trampoline that opens the native input method picker.
- * It stays registered as the active input client while the system dialog is
- * visible, then finishes once the dialog releases focus.
+ * Transparent trampoline that opens the native input method picker and grades
+ * the user's choice only after the system dialog has been dismissed.
  */
 public final class SwitchBackActivity extends Activity {
 
     private static final String TAG = "AltShift";
-    private static final long PICKER_DELAY_MS = 200L;
-    private static final long PICKER_CLOSE_DELAY_MS = 500L;
+
+    /**
+     * One frame is not enough for the platform to register this window as the
+     * active input client, so the picker request is briefly deferred.
+     */
+    private static final long PICKER_LAUNCH_DELAY_MS = 200L;
     private static final long SAFETY_FINISH_MS = 15000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private InputClientView inputClient;
-    private boolean pickerShown;
+    private boolean pickerRequested;
     private boolean pickerLostFocus;
-    private boolean finishScheduled;
+    private boolean pickerDismissed;
 
     public static void start(Context context) {
         if (context == null) {
@@ -60,7 +66,7 @@ public final class SwitchBackActivity extends Activity {
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
         setContentView(createInputClient());
-        handler.postDelayed(this::finishWithoutAnimation, SAFETY_FINISH_MS);
+        handler.postDelayed(this::finishSilently, SAFETY_FINISH_MS);
     }
 
     @Override
@@ -68,23 +74,22 @@ public final class SwitchBackActivity extends Activity {
         super.onWindowFocusChanged(hasFocus);
 
         if (!hasFocus) {
-            // The picker is an independent system window. Keep this client
-            // alive while it is visible, otherwise the dialog is dismissed.
-            pickerLostFocus = pickerShown;
+            // The picker is an independent system window. Losing focus is the
+            // signal that it is now on screen and owns the interaction.
+            pickerLostFocus = pickerRequested;
 
             return;
         }
 
-        if (!pickerShown) {
-            focusInputClient();
-            pickerShown = true;
-            handler.postDelayed(this::showPicker, PICKER_DELAY_MS);
+        if (!pickerRequested) {
+            requestPicker();
 
             return;
         }
 
         if (pickerLostFocus) {
-            scheduleFinish();
+            onPickerDismissed();
+            finishSilently();
         }
     }
 
@@ -113,19 +118,21 @@ public final class SwitchBackActivity extends Activity {
         return root;
     }
 
-    private void focusInputClient() {
-        InputClientView client = inputClient;
-        if (client != null && !client.hasFocus()) {
-            client.requestFocus();
-        }
+    private void requestPicker() {
+        pickerRequested = true;
+        handler.postDelayed(this::showPicker, PICKER_LAUNCH_DELAY_MS);
     }
 
     private void showPicker() {
-        InputMethodManager imm = getSystemService(InputMethodManager.class);
-        if (imm == null) {
+        if (isFinishing() || pickerDismissed) {
+            return;
+        }
+
+        InputMethodManager manager = getSystemService(InputMethodManager.class);
+        if (manager == null) {
             Log.w(TAG, "InputMethodManager is unavailable for the picker");
 
-            finishWithoutAnimation();
+            finishSilently();
 
             return;
         }
@@ -133,35 +140,53 @@ public final class SwitchBackActivity extends Activity {
         focusInputClient();
 
         try {
-            imm.showInputMethodPicker();
+            manager.showInputMethodPicker();
             Log.i(TAG, "System input method picker requested");
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to show the input method picker", exception);
 
-            finishWithoutAnimation();
+            finishSilently();
         }
     }
 
     /**
-     * Finishing as soon as focus returns can race with the dialog teardown.
-     * A short delay lets the system close the picker before this task exits.
+     * Focus can only return here after the picker dialog is gone, so this is
+     * the single point where the pending switch attempt is evaluated.
      */
-    private void scheduleFinish() {
-        if (finishScheduled) {
+    private void onPickerDismissed() {
+        if (pickerDismissed) {
             return;
         }
 
-        finishScheduled = true;
-        handler.postDelayed(this::finishWithoutAnimation, PICKER_CLOSE_DELAY_MS);
+        pickerDismissed = true;
+
+        if (!InputMethodSwitcher.isAltShiftActive(this)) {
+            KeyboardNotification.showInactive(this);
+
+            return;
+        }
+
+        KeyboardNotification.cancel(this);
     }
 
-    private void finishWithoutAnimation() {
+    private void focusInputClient() {
+        InputClientView client = inputClient;
+        if (client != null && !client.hasFocus()) {
+            client.requestFocus();
+        }
+    }
+
+    /**
+     * Timeout path for a picker that never took focus. It must never post a
+     * notification because the user did not finish a deliberate interaction.
+     */
+    private void finishSilently() {
         if (isFinishing()) {
             return;
         }
 
-        overridePendingTransition(0, 0);
         finish();
+        overridePendingTransition(0, 0);
     }
 
     private static final class InputClientView extends View {

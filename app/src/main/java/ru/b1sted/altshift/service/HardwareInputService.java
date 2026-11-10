@@ -364,7 +364,6 @@ public final class HardwareInputService extends InputMethodService {
     private static final class KeyboardMonitor {
 
         private static final long DEBOUNCE_MS = 150L;
-        private static final long PICKER_EVALUATION_DELAY_MS = 2500L;
         private static final Object LOCK = new Object();
 
         private static volatile KeyboardMonitor instance;
@@ -374,7 +373,6 @@ public final class HardwareInputService extends InputMethodService {
         private final HandlerThread inputThread;
         private final Handler inputHandler;
         private final Runnable checkTask = this::runReconcile;
-        private final Runnable evaluateSwitchAttemptTask = this::evaluateSwitchAttempt;
         private final ContentObserver imeObserver;
 
         private final InputManager.InputDeviceListener deviceListener =
@@ -402,7 +400,6 @@ public final class HardwareInputService extends InputMethodService {
                 new WeakReference<>(null);
         private volatile boolean keyboardPresent;
         private volatile boolean alternativeImeAvailable = true;
-        private volatile boolean pendingSwitchAttempt;
         private boolean warningPosted;
         private boolean initialized;
 
@@ -563,7 +560,6 @@ public final class HardwareInputService extends InputMethodService {
                     && InputMethodSwitcher.isAltShiftEnabled(appContext));
 
             if (!present || InputMethodSwitcher.isAltShiftActive(appContext)) {
-                clearPendingSwitchAttempt();
                 KeyboardNotification.cancel(appContext);
             }
         }
@@ -642,21 +638,14 @@ public final class HardwareInputService extends InputMethodService {
             }
         }
 
+        /**
+         * Dismissing the prompt is the only action that starts the picker. The
+         * notification is graded by {@link SwitchBackActivity} after the user
+         * closes the dialog; closing the prompt never posts anything.
+         */
         private void requestPickerSwitch() {
-            armSwitchAttempt();
             KeyboardPromptOverlay.dismissActive();
             SwitchBackActivity.start(appContext);
-        }
-
-        private void armSwitchAttempt() {
-            pendingSwitchAttempt = true;
-            inputHandler.removeCallbacks(evaluateSwitchAttemptTask);
-            inputHandler.postDelayed(evaluateSwitchAttemptTask, PICKER_EVALUATION_DELAY_MS);
-        }
-
-        private void clearPendingSwitchAttempt() {
-            pendingSwitchAttempt = false;
-            inputHandler.removeCallbacks(evaluateSwitchAttemptTask);
         }
 
         private void onInputMethodSettingsChanged() {
@@ -664,34 +653,8 @@ public final class HardwareInputService extends InputMethodService {
             scheduleCheckInternal();
 
             if (InputMethodSwitcher.isAltShiftActive(appContext)) {
-                clearPendingSwitchAttempt();
                 KeyboardNotification.cancel(appContext);
-
-                return;
             }
-
-            if (!pendingSwitchAttempt) {
-                return;
-            }
-
-            inputHandler.removeCallbacks(evaluateSwitchAttemptTask);
-            inputHandler.post(evaluateSwitchAttemptTask);
-        }
-
-        private void evaluateSwitchAttempt() {
-            if (!pendingSwitchAttempt) {
-                return;
-            }
-
-            if (!keyboardPresent || InputMethodSwitcher.isAltShiftActive(appContext)) {
-                clearPendingSwitchAttempt();
-                KeyboardNotification.cancel(appContext);
-
-                return;
-            }
-
-            clearPendingSwitchAttempt();
-            KeyboardNotification.showInactive(appContext);
         }
 
         private void switchToSoftKeyboard(boolean showPickerOnFailure) {
