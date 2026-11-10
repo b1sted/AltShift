@@ -24,7 +24,6 @@ import ru.b1sted.altshift.R;
 public final class KeyboardWarningNotification {
 
     private static final String TAG = "AltShift";
-    private static final String CHANNEL_ID = "warning_channel";
     private static final int NOTIFICATION_ID = 2001;
     private static final int REQUEST_CODE = 2002;
 
@@ -32,7 +31,7 @@ public final class KeyboardWarningNotification {
     }
 
     /**
-     * Posts a silent warning notification. Returns true when the notification
+     * Posts an audible warning notification. Returns true when the notification
      * was handed to the system.
      */
     public static boolean show(Context context) {
@@ -57,21 +56,19 @@ public final class KeyboardWarningNotification {
             ensureChannel(context, manager);
 
             PendingIntent pendingIntent = createSettingsIntent(context);
-            Notification.Builder builder = new Notification.Builder(context, CHANNEL_ID);
+            Notification.Builder builder =
+                    new Notification.Builder(context, NotificationChannels.KEYBOARD_WARNING);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
                     .setContentTitle(context.getString(
                             R.string.notification_no_keyboard_title))
                     .setContentText(context.getString(
                             R.string.notification_no_keyboard_text))
                     .setContentIntent(pendingIntent)
-                    .setAutoCancel(true)
+                    .setOngoing(true)
                     .setOnlyAlertOnce(true)
-                    .setDefaults(0)
-                    .setSound(null)
-                    .setVibrate(null)
                     .setShowWhen(false)
                     .setCategory(Notification.CATEGORY_STATUS)
-                    .setPriority(Notification.PRIORITY_LOW)
+                    .setPriority(Notification.PRIORITY_DEFAULT)
                     .addAction(new Notification.Action.Builder(
                             Icon.createWithResource(context, R.drawable.ic_notification_keyboard),
                             context.getString(R.string.notification_keyboard_settings),
@@ -116,16 +113,18 @@ public final class KeyboardWarningNotification {
     }
 
     private static void ensureChannel(Context context, NotificationManager manager) {
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                context.getString(R.string.notification_warning_channel_name),
-                NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription(context.getString(
-                R.string.notification_warning_channel_description));
-        channel.setSound(null, null);
-        channel.enableVibration(false);
-        channel.setShowBadge(false);
+        NotificationChannel channel = manager.getNotificationChannel(
+                NotificationChannels.KEYBOARD_WARNING);
+        if (channel == null) {
+            channel = new NotificationChannel(
+                    NotificationChannels.KEYBOARD_WARNING,
+                    context.getString(R.string.notification_warning_channel_name),
+                    NotificationManager.IMPORTANCE_DEFAULT);
+            channel.setDescription(context.getString(
+                    R.string.notification_warning_channel_description));
+        }
 
+        channel.enableVibration(true);
         manager.createNotificationChannel(channel);
     }
 

@@ -597,13 +597,13 @@ public final class HardwareInputService extends InputMethodService {
         private void applyKeyboardAttached() {
             if (isAutoSwitchPreferenceEnabled()
                     && InputMethodSwitcher.switchToAltShift(appContext)) {
-                mainHandler.post(KeyboardPromptOverlay::dismiss);
+                KeyboardPromptOverlay.dismissActive();
 
                 return;
             }
 
             if (InputMethodSwitcher.isAltShiftActive(appContext)) {
-                mainHandler.post(KeyboardPromptOverlay::dismiss);
+                KeyboardPromptOverlay.dismissActive();
 
                 return;
             }
@@ -613,7 +613,7 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         private void applyKeyboardDetached(boolean alternative) {
-            mainHandler.post(KeyboardPromptOverlay::dismiss);
+            KeyboardPromptOverlay.dismissActive();
 
             if (!alternative || !isAutoSwitchPreferenceEnabled()) {
                 return;
@@ -642,7 +642,7 @@ public final class HardwareInputService extends InputMethodService {
 
         private void requestPickerSwitch() {
             armSwitchAttempt();
-            KeyboardPromptOverlay.dismiss();
+            KeyboardPromptOverlay.dismissActive();
             SwitchBackActivity.start(appContext);
         }
 

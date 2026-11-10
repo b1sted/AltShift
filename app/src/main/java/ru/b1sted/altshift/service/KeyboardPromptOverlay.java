@@ -34,11 +34,11 @@ public final class KeyboardPromptOverlay {
     private final Context context;
     private final WindowManager windowManager;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Runnable dismissRunnable = this::dismissSelf;
+    private final Runnable dismissRunnable = this::dismiss;
 
     private ViewKeyboardPromptBinding binding;
     private Runnable onSwitch;
-    private boolean shown;
+    private volatile boolean shown;
 
     private KeyboardPromptOverlay(Context context) {
         this.context = context;
@@ -89,14 +89,14 @@ public final class KeyboardPromptOverlay {
             active = overlay;
 
             if (previous != null && previous != overlay) {
-                previous.dismissInternal();
+                previous.dismiss();
             }
         }
 
         return true;
     }
 
-    public static void dismiss() {
+    public static void dismissActive() {
         KeyboardPromptOverlay overlay;
 
         synchronized (LOCK) {
@@ -104,7 +104,7 @@ public final class KeyboardPromptOverlay {
         }
 
         if (overlay != null) {
-            overlay.dismissInternal();
+            overlay.dismiss();
         }
     }
 
@@ -128,7 +128,7 @@ public final class KeyboardPromptOverlay {
 
                 onSwitch = switchAction;
                 inflated.promptAction.setOnClickListener(view -> runSwitchAction());
-                inflated.promptClose.setOnClickListener(view -> dismissSelf());
+                inflated.promptClose.setOnClickListener(view -> dismiss());
 
                 binding = inflated;
                 windowManager.addView(inflated.getRoot(), createParams());
@@ -154,7 +154,7 @@ public final class KeyboardPromptOverlay {
 
     private void runSwitchAction() {
         Runnable action = onSwitch;
-        dismissSelf();
+        dismiss();
 
         if (action != null) {
             action.run();
@@ -178,74 +178,53 @@ public final class KeyboardPromptOverlay {
         }
     }
 
-    private void dismissSelf() {
-        dismissInternal();
-    }
-
-    private void dismissInternal() {
+    /**
+     * Clears the logical state synchronously, then detaches the view on the main
+     * thread. A failed detach can never leave {@link #shown} stuck as true.
+     */
+    public void dismiss() {
         handler.removeCallbacks(dismissRunnable);
+        shown = false;
 
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            handler.post(this::dismissInternal);
+            handler.post(this::removePromptView);
 
             return;
         }
 
-        ViewKeyboardPromptBinding local;
-        View root;
-
-        synchronized (LOCK) {
-            local = binding;
-            if (local == null) {
-                clearLocked(null);
-
-                return;
-            }
-
-            root = local.getRoot();
-            if (root == null || !root.isAttachedToWindow()) {
-                clearLocked(local);
-
-                return;
-            }
-        }
-
-        boolean removed = false;
-        WindowManager manager = windowManager;
-
-        if (manager != null) {
-            try {
-                manager.removeViewImmediate(root);
-                removed = true;
-            } catch (IllegalArgumentException exception) {
-                Log.w(TAG, "Overlay was already detached from the window manager", exception);
-                removed = true;
-            } catch (RuntimeException exception) {
-                Log.w(TAG, "Unable to remove the keyboard prompt overlay", exception);
-            }
-        }
-
-        synchronized (LOCK) {
-            if (removed || !root.isAttachedToWindow()) {
-                clearLocked(local);
-                Log.d(TAG, "Keyboard prompt overlay dismissed");
-
-                return;
-            }
-
-            Log.w(TAG, "Overlay is still attached; keeping state for a retry");
-        }
+        removePromptView();
     }
 
-    private void clearLocked(ViewKeyboardPromptBinding expected) {
-        if (expected == null || binding == expected) {
+    private void removePromptView() {
+        ViewKeyboardPromptBinding local;
+        synchronized (LOCK) {
+            local = binding;
             binding = null;
+            onSwitch = null;
+
+            if (active == this) {
+                active = null;
+            }
         }
 
-        shown = false;
-        onSwitch = null;
-        if (active == this) {
-            active = null;
+        if (local == null) {
+            return;
+        }
+
+        WindowManager manager = windowManager;
+        if (manager == null) {
+            return;
+        }
+
+        try {
+            View root = local.getRoot();
+            if (root != null && root.isAttachedToWindow()) {
+                manager.removeViewImmediate(root);
+            }
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to remove prompt view", exception);
+        } finally {
+            Log.d(TAG, "Keyboard prompt overlay dismissed");
         }
     }
 

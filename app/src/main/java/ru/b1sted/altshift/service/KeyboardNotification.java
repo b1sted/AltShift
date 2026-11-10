@@ -18,12 +18,11 @@ import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.ui.SwitchBackActivity;
 
 /**
- * Posts a silent status notification when a deliberate switch attempt failed.
+ * Posts a status notification when a deliberate switch attempt failed.
  */
 public final class KeyboardNotification {
 
     private static final String TAG = "AltShift";
-    private static final String CHANNEL_ID = "keyboard_state";
     private static final int NOTIFICATION_ID = 1001;
     private static final int REQUEST_CODE = 1002;
 
@@ -61,21 +60,18 @@ public final class KeyboardNotification {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
             Notification.Builder builder =
-                    new Notification.Builder(context, CHANNEL_ID);
+                    new Notification.Builder(context, NotificationChannels.KEYBOARD_STATE);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
                     .setContentTitle(context.getString(
                             R.string.notification_inactive_title))
                     .setContentText(context.getString(
                             R.string.notification_inactive_text))
                     .setContentIntent(pendingIntent)
-                    .setAutoCancel(true)
+                    .setOngoing(true)
                     .setOnlyAlertOnce(true)
-                    .setDefaults(0)
-                    .setSound(null)
-                    .setVibrate(null)
                     .setShowWhen(false)
                     .setCategory(Notification.CATEGORY_STATUS)
-                    .setPriority(Notification.PRIORITY_LOW)
+                    .setPriority(Notification.PRIORITY_DEFAULT)
                     .addAction(new Notification.Action.Builder(
                             Icon.createWithResource(context, R.drawable.ic_notification_keyboard),
                             context.getString(R.string.notification_switch_back),
@@ -113,13 +109,18 @@ public final class KeyboardNotification {
     }
 
     private static void ensureChannel(Context context, NotificationManager manager) {
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                context.getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription(context.getString(
-                R.string.notification_channel_description));
+        NotificationChannel channel = manager.getNotificationChannel(
+                NotificationChannels.KEYBOARD_STATE);
+        if (channel == null) {
+            channel = new NotificationChannel(
+                    NotificationChannels.KEYBOARD_STATE,
+                    context.getString(R.string.notification_channel_name),
+                    NotificationManager.IMPORTANCE_DEFAULT);
+            channel.setDescription(context.getString(
+                    R.string.notification_channel_description));
+        }
 
+        channel.enableVibration(true);
         manager.createNotificationChannel(channel);
     }
 
