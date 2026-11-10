@@ -17,22 +17,34 @@ public final class KeyboardPresenceMonitor {
     private KeyboardPresenceMonitor() {
     }
 
-    public static boolean isPhysicalKeyboardAvailable(Context context) {
+    /**
+     * Cheap configuration-only check. Safe to call on the main thread because it
+     * performs no Binder IPC.
+     */
+    public static boolean isPhysicalKeyboardReported(Context context) {
         if (context == null) {
             return false;
         }
 
         try {
-            Configuration configuration =
-                    context.getResources().getConfiguration();
-            boolean reported = configuration.keyboard != Configuration.KEYBOARD_NOKEYS
-                    && configuration.hardKeyboardHidden
-                    == Configuration.HARDKEYBOARDHIDDEN_NO;
-            if (reported) {
-                return true;
-            }
+            Configuration configuration = context.getResources().getConfiguration();
+
+            return configuration.keyboard != Configuration.KEYBOARD_NOKEYS
+                    && configuration.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO;
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to read keyboard configuration", exception);
+
+            return false;
+        }
+    }
+
+    public static boolean isPhysicalKeyboardAvailable(Context context) {
+        if (context == null) {
+            return false;
+        }
+
+        if (isPhysicalKeyboardReported(context)) {
+            return true;
         }
 
         return hasKeyboardInputDevice(context);

@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.hardware.input.InputManager;
 import android.inputmethodservice.InputMethodService;
-import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -17,6 +16,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 
+import java.lang.ref.WeakReference;
 import java.util.Objects;
 
 import ru.b1sted.altshift.R;
@@ -31,26 +31,7 @@ public final class HardwareInputService extends InputMethodService {
     private static final String TAG = "AltShift";
     private static final String INPUT_THREAD_NAME = "AltShift-Input";
 
-    private final InputManager.InputDeviceListener deviceListener =
-            new InputManager.InputDeviceListener() {
-                @Override
-                public void onInputDeviceAdded(int deviceId) {
-                    handleKeyboardStateChange();
-                }
-
-                @Override
-                public void onInputDeviceRemoved(int deviceId) {
-                    handleKeyboardStateChange();
-                }
-
-                @Override
-                public void onInputDeviceChanged(int deviceId) {
-                    handleKeyboardStateChange();
-                }
-            };
-
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Runnable keyboardCheckTask = this::handleKeyboardStateChange;
     private final Runnable refreshInputViewTask = this::refreshInputView;
 
     private volatile HotkeyBinding[] bindings = new HotkeyBinding[0];
@@ -60,32 +41,28 @@ public final class HardwareInputService extends InputMethodService {
     private volatile boolean shuttingDown;
 
     private HotkeyRepository repository;
-    private InputManager inputManager;
-    private HandlerThread inputThread;
-    private Handler inputHandler;
     private ViewImeFallbackBinding fallbackBinding;
     private boolean isRussian;
-    private boolean listenerRegistered;
 
     @Override
     public void onCreate() {
         super.onCreate();
 
-        keyboardPresent = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this);
-        registerDeviceListener();
-
         repository = Objects.requireNonNull(
                 HotkeyRepository.getInstance(this), "repository");
         reloadConfiguration();
-        postKeyboardCheck();
+
+        State state = KeyboardMonitor.acquire(this);
+        keyboardPresent = state.keyboardPresent();
+        alternativeImeAvailable = state.alternativeImeAvailable();
+        mainHandler.post(refreshInputViewTask);
     }
 
     @Override
     public void onDestroy() {
         shuttingDown = true;
 
-        unregisterDeviceListener();
-        stopInputThread();
+        KeyboardMonitor.release(this);
         mainHandler.removeCallbacksAndMessages(null);
         fallbackBinding = null;
 
@@ -96,7 +73,7 @@ public final class HardwareInputService extends InputMethodService {
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
 
-        postKeyboardCheck();
+        KeyboardMonitor.scheduleCheck();
     }
 
     @Override
@@ -104,14 +81,14 @@ public final class HardwareInputService extends InputMethodService {
         super.onStartInput(attribute, restarting);
 
         reloadConfiguration();
-        postKeyboardCheck();
+        KeyboardMonitor.scheduleCheck();
     }
 
     @Override
     public View onCreateInputView() {
         fallbackBinding = ViewImeFallbackBinding.inflate(getLayoutInflater());
         fallbackBinding.switchKeyboardButton.setOnClickListener(
-                view -> switchToSoftKeyboard(true));
+                view -> KeyboardMonitor.requestSoftKeyboardSwitch(true));
         fallbackBinding.openKeyboardSettingsButton.setOnClickListener(
                 view -> openKeyboardSettings());
 
@@ -171,30 +148,21 @@ public final class HardwareInputService extends InputMethodService {
         return super.onKeyDown(keyCode, event);
     }
 
-    private void postKeyboardCheck() {
-        Handler handler = inputHandler;
-        if (handler == null) {
-            return;
-        }
-
-        handler.post(keyboardCheckTask);
+    /**
+     * Keeps the persistent device monitor alive even while another IME is active.
+     * This is the only entry point used outside the service lifecycle.
+     */
+    public static void startKeyboardMonitor(Context context) {
+        KeyboardMonitor.ensureStarted(context);
     }
 
-    private void handleKeyboardStateChange() {
+    private void onKeyboardStateReconciled(boolean present, boolean alternative) {
         if (shuttingDown) {
             return;
         }
 
-        boolean present = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this);
-        boolean alternative = InputMethodSwitcher.hasAlternativeInputMethod(this);
-        boolean changed = present != keyboardPresent;
-
+        keyboardPresent = present;
         alternativeImeAvailable = alternative;
-        if (changed) {
-            keyboardPresent = present;
-            updateKeyboardState(present);
-        }
-
         mainHandler.post(refreshInputViewTask);
     }
 
@@ -223,98 +191,6 @@ public final class HardwareInputService extends InputMethodService {
                 stranded ? View.VISIBLE : View.GONE);
     }
 
-    private void updateKeyboardState(boolean present) {
-        boolean autoSwitch = isAutoSwitchEnabled();
-
-        if (present) {
-            if (autoSwitch && InputMethodSwitcher.switchToAltShift(this)) {
-                return;
-            }
-
-            if (!isActiveInputMethod()) {
-                showReconnectPrompt();
-            }
-
-            return;
-        }
-
-        KeyboardPromptOverlay.dismiss();
-
-        if (!alternativeImeAvailable) {
-            return;
-        }
-
-        if (autoSwitch && InputMethodSwitcher.switchToSoftKeyboard(this)) {
-            return;
-        }
-
-        switchToSoftKeyboard(false);
-    }
-
-    private void showReconnectPrompt() {
-        KeyboardNotification.cancel(this);
-
-        Context appContext = getApplicationContext();
-        boolean shown = KeyboardPromptOverlay.show(
-                appContext, () -> SwitchBackActivity.start(appContext));
-        if (shown) {
-            return;
-        }
-
-        KeyboardNotification.showReconnected(appContext);
-    }
-
-    private boolean isAutoSwitchEnabled() {
-        HotkeyRepository local = repository;
-        if (local == null) {
-            return false;
-        }
-
-        return local.isAutoSwitchEnabled()
-                && InputMethodSwitcher.hasSecureSettingsPermission(this);
-    }
-
-    private void switchToSoftKeyboard(boolean showPickerOnFailure) {
-        if (!alternativeImeAvailable) {
-            openKeyboardSettings();
-
-            return;
-        }
-
-        try {
-            if (switchToAvailableInputMethod()) {
-                return;
-            }
-
-            if (showPickerOnFailure) {
-                showInputMethodPicker();
-            }
-        } catch (RuntimeException exception) {
-            Log.w(TAG, "Unable to switch to the soft keyboard", exception);
-        }
-    }
-
-    private boolean switchToAvailableInputMethod() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            return false;
-        }
-
-        if (switchToPreviousInputMethod()) {
-            return true;
-        }
-
-        return switchToNextInputMethod(false);
-    }
-
-    private void showInputMethodPicker() {
-        InputMethodManager manager = getSystemService(InputMethodManager.class);
-        if (manager == null) {
-            return;
-        }
-
-        manager.showInputMethodPicker();
-    }
-
     private void openKeyboardSettings() {
         Intent intent = new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -324,59 +200,6 @@ public final class HardwareInputService extends InputMethodService {
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to open keyboard settings", exception);
         }
-    }
-
-    private boolean isActiveInputMethod() {
-        return InputMethodSwitcher.isAltShiftActive(this);
-    }
-
-    private void registerDeviceListener() {
-        try {
-            inputThread = new HandlerThread(INPUT_THREAD_NAME);
-            inputThread.start();
-            inputHandler = new Handler(inputThread.getLooper());
-
-            inputManager = getSystemService(InputManager.class);
-            if (inputManager == null) {
-                return;
-            }
-
-            inputManager.registerInputDeviceListener(deviceListener, inputHandler);
-            listenerRegistered = true;
-        } catch (RuntimeException exception) {
-            Log.e(TAG, "Unable to register input device listener", exception);
-        }
-    }
-
-    private void unregisterDeviceListener() {
-        if (!listenerRegistered) {
-            return;
-        }
-
-        listenerRegistered = false;
-
-        try {
-            InputManager manager = inputManager;
-            if (manager != null) {
-                manager.unregisterInputDeviceListener(deviceListener);
-            }
-        } catch (RuntimeException exception) {
-            Log.w(TAG, "Unable to unregister input device listener", exception);
-        } finally {
-            inputManager = null;
-        }
-    }
-
-    private void stopInputThread() {
-        HandlerThread thread = inputThread;
-        inputThread = null;
-        inputHandler = null;
-
-        if (thread == null) {
-            return;
-        }
-
-        thread.quitSafely();
     }
 
     private void reloadConfiguration() {
@@ -467,5 +290,310 @@ public final class HardwareInputService extends InputMethodService {
 
             return false;
         }
+    }
+
+    /**
+     * Single process-wide owner of input-device monitoring and IME switching.
+     * It outlives the IME binding so a re-attached keyboard can reactivate AltShift.
+     */
+    private static final class KeyboardMonitor {
+
+        private static final long DEBOUNCE_MS = 150L;
+        private static final Object LOCK = new Object();
+
+        private static volatile KeyboardMonitor instance;
+
+        private final Context appContext;
+        private final Handler mainHandler = new Handler(Looper.getMainLooper());
+        private final HandlerThread inputThread;
+        private final Handler inputHandler;
+        private final Runnable checkTask = this::reconcile;
+        private final Runnable activateAltShiftTask = this::activateAltShift;
+
+        private final InputManager.InputDeviceListener deviceListener =
+                new InputManager.InputDeviceListener() {
+                    @Override
+                    public void onInputDeviceAdded(int deviceId) {
+                        Log.d(TAG, "Input device added: " + deviceId);
+                        scheduleCheck();
+                    }
+
+                    @Override
+                    public void onInputDeviceRemoved(int deviceId) {
+                        Log.d(TAG, "Input device removed: " + deviceId);
+                        scheduleCheck();
+                    }
+
+                    @Override
+                    public void onInputDeviceChanged(int deviceId) {
+                        Log.d(TAG, "Input device changed: " + deviceId);
+                        scheduleCheck();
+                    }
+                };
+
+        private volatile WeakReference<HardwareInputService> serviceRef =
+                new WeakReference<>(null);
+        private volatile boolean keyboardPresent;
+        private volatile boolean alternativeImeAvailable = true;
+        private boolean initialized;
+
+        private KeyboardMonitor(Context appContext) {
+            this.appContext = appContext;
+            keyboardPresent = KeyboardPresenceMonitor.isPhysicalKeyboardReported(appContext);
+
+            inputThread = new HandlerThread(INPUT_THREAD_NAME);
+            inputThread.start();
+            inputHandler = new Handler(inputThread.getLooper());
+
+            registerDeviceListener();
+            inputHandler.post(checkTask);
+        }
+
+        static State acquire(HardwareInputService service) {
+            Context appContext = service.getApplicationContext();
+
+            synchronized (LOCK) {
+                if (instance == null) {
+                    instance = new KeyboardMonitor(appContext);
+                }
+
+                KeyboardMonitor monitor = instance;
+                monitor.serviceRef = new WeakReference<>(service);
+                monitor.scheduleCheckInternal();
+
+                return new State(
+                        monitor.keyboardPresent,
+                        monitor.alternativeImeAvailable);
+            }
+        }
+
+        static void release(HardwareInputService service) {
+            synchronized (LOCK) {
+                KeyboardMonitor monitor = instance;
+                if (monitor == null) {
+                    return;
+                }
+
+                monitor.clearService(service);
+            }
+        }
+
+        static void ensureStarted(Context context) {
+            if (context == null) {
+                return;
+            }
+
+            Context appContext = context.getApplicationContext();
+
+            synchronized (LOCK) {
+                if (instance == null) {
+                    instance = new KeyboardMonitor(appContext);
+                    return;
+                }
+
+                instance.scheduleCheckInternal();
+            }
+        }
+
+        static void scheduleCheck() {
+            KeyboardMonitor monitor = instance;
+            if (monitor == null) {
+                return;
+            }
+
+            monitor.scheduleCheckInternal();
+        }
+
+        static void requestSoftKeyboardSwitch(boolean showPickerOnFailure) {
+            KeyboardMonitor monitor = instance;
+            if (monitor == null) {
+                return;
+            }
+
+            monitor.inputHandler.removeCallbacks(monitor.checkTask);
+            monitor.inputHandler.post(
+                    () -> monitor.switchToSoftKeyboard(showPickerOnFailure));
+        }
+
+        static void requestAltShiftActivation() {
+            KeyboardMonitor monitor = instance;
+            if (monitor == null) {
+                return;
+            }
+
+            monitor.inputHandler.removeCallbacks(monitor.checkTask);
+            monitor.inputHandler.post(monitor.activateAltShiftTask);
+        }
+
+        private void clearService(HardwareInputService service) {
+            if (serviceRef.get() == service) {
+                serviceRef.clear();
+            }
+        }
+
+        private void scheduleCheckInternal() {
+            inputHandler.removeCallbacks(checkTask);
+            inputHandler.postDelayed(checkTask, DEBOUNCE_MS);
+        }
+
+        private void registerDeviceListener() {
+            try {
+                InputManager manager = appContext.getSystemService(InputManager.class);
+                if (manager == null) {
+                    Log.w(TAG, "InputManager is unavailable");
+
+                    return;
+                }
+
+                manager.registerInputDeviceListener(deviceListener, inputHandler);
+            } catch (RuntimeException exception) {
+                Log.e(TAG, "Unable to register the input device listener", exception);
+            }
+        }
+
+        private void reconcile() {
+            boolean present = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(appContext);
+            boolean alternative = InputMethodSwitcher.hasAlternativeInputMethod(appContext);
+            boolean changed = !initialized || present != keyboardPresent;
+
+            keyboardPresent = present;
+            alternativeImeAvailable = alternative;
+            initialized = true;
+
+            if (changed) {
+                Log.i(TAG, "Physical keyboard state changed: present=" + present);
+                applyKeyboardState(present, alternative);
+            }
+
+            HardwareInputService service = serviceRef.get();
+            if (service != null) {
+                service.onKeyboardStateReconciled(present, alternative);
+            }
+        }
+
+        private void applyKeyboardState(boolean present, boolean alternative) {
+            if (present) {
+                applyKeyboardAttached();
+
+                return;
+            }
+
+            applyKeyboardDetached(alternative);
+        }
+
+        private void applyKeyboardAttached() {
+            if (isAutoSwitchEnabled() && InputMethodSwitcher.switchToAltShift(appContext)) {
+                mainHandler.post(KeyboardPromptOverlay::dismiss);
+                KeyboardNotification.cancel(appContext);
+
+                return;
+            }
+
+            if (InputMethodSwitcher.isAltShiftActive(appContext)) {
+                mainHandler.post(KeyboardPromptOverlay::dismiss);
+
+                return;
+            }
+
+            mainHandler.post(this::showReconnectPrompt);
+        }
+
+        private void applyKeyboardDetached(boolean alternative) {
+            mainHandler.post(KeyboardPromptOverlay::dismiss);
+
+            if (!alternative) {
+                return;
+            }
+
+            if (isAutoSwitchEnabled()) {
+                InputMethodSwitcher.switchToSoftKeyboard(appContext);
+            }
+        }
+
+        private boolean isAutoSwitchEnabled() {
+            try {
+                return HotkeyRepository.getInstance(appContext).isAutoSwitchEnabled()
+                        && InputMethodSwitcher.hasSecureSettingsPermission(appContext);
+            } catch (RuntimeException exception) {
+                Log.e(TAG, "Unable to read the auto-switch setting", exception);
+
+                return false;
+            }
+        }
+
+        private void activateAltShift() {
+            if (InputMethodSwitcher.switchToAltShift(appContext)) {
+                mainHandler.post(KeyboardPromptOverlay::dismiss);
+                KeyboardNotification.cancel(appContext);
+
+                return;
+            }
+
+            Log.w(TAG, "Direct IME activation failed; opening the system picker");
+            mainHandler.post(() -> {
+                KeyboardPromptOverlay.dismiss();
+                SwitchBackActivity.start(appContext);
+            });
+        }
+
+        private void switchToSoftKeyboard(boolean showPickerOnFailure) {
+            if (!alternativeImeAvailable) {
+                mainHandler.post(this::openKeyboardSettings);
+
+                return;
+            }
+
+            if (InputMethodSwitcher.switchToSoftKeyboard(appContext)) {
+                return;
+            }
+
+            if (showPickerOnFailure) {
+                mainHandler.post(this::showInputMethodPicker);
+            }
+        }
+
+        private void showReconnectPrompt() {
+            KeyboardNotification.cancel(appContext);
+
+            boolean secure = InputMethodSwitcher.hasSecureSettingsPermission(appContext);
+            Runnable onSwitch = secure
+                    ? KeyboardMonitor::requestAltShiftActivation
+                    : () -> SwitchBackActivity.start(appContext);
+
+            if (KeyboardPromptOverlay.show(appContext, onSwitch)) {
+                return;
+            }
+
+            KeyboardNotification.showReconnected(appContext);
+        }
+
+        private void showInputMethodPicker() {
+            InputMethodManager manager = appContext.getSystemService(InputMethodManager.class);
+            if (manager != null) {
+                try {
+                    manager.showInputMethodPicker();
+
+                    return;
+                } catch (RuntimeException exception) {
+                    Log.w(TAG, "Unable to show the input method picker", exception);
+                }
+            }
+
+            SwitchBackActivity.start(appContext);
+        }
+
+        private void openKeyboardSettings() {
+            Intent intent = new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            try {
+                appContext.startActivity(intent);
+            } catch (RuntimeException exception) {
+                Log.w(TAG, "Unable to open keyboard settings", exception);
+            }
+        }
+    }
+
+    private record State(boolean keyboardPresent, boolean alternativeImeAvailable) {
     }
 }

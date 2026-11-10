@@ -26,6 +26,7 @@ public final class KeyboardPromptOverlay {
 
     private static final String TAG = "AltShift";
     private static final long AUTO_DISMISS_MS = 12000L;
+    private static final Object LOCK = new Object();
 
     @SuppressLint("StaticFieldLeak")
     private static KeyboardPromptOverlay active;
@@ -55,9 +56,17 @@ public final class KeyboardPromptOverlay {
             return false;
         }
 
-        KeyboardPromptOverlay current = active;
-        if (current != null && current.shown) {
-            return true;
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            Log.w(TAG, "Overlay must be shown from the main thread");
+
+            return false;
+        }
+
+        synchronized (LOCK) {
+            KeyboardPromptOverlay current = active;
+            if (current != null && current.shown) {
+                return true;
+            }
         }
 
         KeyboardPromptOverlay overlay = new KeyboardPromptOverlay(appContext);
@@ -65,87 +74,157 @@ public final class KeyboardPromptOverlay {
             return false;
         }
 
-        active = overlay;
+        synchronized (LOCK) {
+            KeyboardPromptOverlay previous = active;
+            active = overlay;
+
+            if (previous != null && previous != overlay) {
+                previous.dismissInternal();
+            }
+        }
 
         return true;
     }
 
     public static void dismiss() {
-        KeyboardPromptOverlay overlay = active;
-        active = null;
+        KeyboardPromptOverlay overlay;
+
+        synchronized (LOCK) {
+            overlay = active;
+        }
 
         if (overlay != null) {
-            overlay.removeView();
+            overlay.dismissInternal();
         }
     }
 
     private boolean showInternal(Runnable onSwitch) {
-        if (windowManager == null || shown) {
-            return shown;
-        }
+        synchronized (LOCK) {
+            if (shown) {
+                return true;
+            }
 
-        try {
-            ContextThemeWrapper themedContext =
-                    new ContextThemeWrapper(context, R.style.Theme_AltShift);
-            ViewKeyboardPromptBinding inflated = ViewKeyboardPromptBinding.inflate(
-                    LayoutInflater.from(themedContext));
+            if (windowManager == null) {
+                return false;
+            }
 
-            inflated.promptAction.setOnClickListener(view -> {
-                dismissSelf();
-                onSwitch.run();
-            });
-            inflated.promptClose.setOnClickListener(view -> dismissSelf());
+            try {
+                ContextThemeWrapper themedContext =
+                        new ContextThemeWrapper(context, R.style.Theme_AltShift);
+                ViewKeyboardPromptBinding inflated = ViewKeyboardPromptBinding.inflate(
+                        LayoutInflater.from(themedContext));
 
-            binding = inflated;
-            windowManager.addView(inflated.getRoot(), createParams());
+                inflated.promptAction.setOnClickListener(view -> {
+                    dismissSelf();
+                    onSwitch.run();
+                });
+                inflated.promptClose.setOnClickListener(view -> dismissSelf());
 
-            shown = true;
-            handler.postDelayed(dismissRunnable, AUTO_DISMISS_MS);
-            Log.d(TAG, "Keyboard prompt overlay shown");
+                binding = inflated;
+                windowManager.addView(inflated.getRoot(), createParams());
 
-            return true;
-        } catch (RuntimeException exception) {
-            Log.w(TAG, "Unable to show the keyboard prompt overlay", exception);
-            removeView();
+                shown = true;
+                handler.postDelayed(dismissRunnable, AUTO_DISMISS_MS);
+                Log.d(TAG, "Keyboard prompt overlay shown");
 
-            return false;
+                return true;
+            } catch (RuntimeException exception) {
+                Log.w(TAG, "Unable to show the keyboard prompt overlay", exception);
+                ViewKeyboardPromptBinding failed = binding;
+                binding = null;
+                shown = false;
+
+                removeFailedView(failed);
+
+                return false;
+            }
         }
     }
 
-    private void dismissSelf() {
-        removeView();
-
-        if (active == this) {
-            active = null;
-        }
-    }
-
-    private void removeView() {
-        handler.removeCallbacks(dismissRunnable);
-
-        ViewKeyboardPromptBinding local = binding;
-        binding = null;
-        shown = false;
-
-        if (local == null) {
+    private void removeFailedView(ViewKeyboardPromptBinding failed) {
+        if (failed == null || windowManager == null) {
             return;
         }
 
-        View root = local.getRoot();
+        View root = failed.getRoot();
         if (root == null || !root.isAttachedToWindow()) {
             return;
         }
 
-        WindowManager manager = windowManager;
-        if (manager == null) {
+        try {
+            windowManager.removeViewImmediate(root);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to remove a partially added overlay", exception);
+        }
+    }
+
+    private void dismissSelf() {
+        dismissInternal();
+    }
+
+    private void dismissInternal() {
+        handler.removeCallbacks(dismissRunnable);
+
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            handler.post(this::dismissInternal);
+
             return;
         }
 
-        try {
-            manager.removeView(root);
-            Log.d(TAG, "Keyboard prompt overlay dismissed");
-        } catch (RuntimeException exception) {
-            Log.w(TAG, "Unable to remove the keyboard prompt overlay", exception);
+        ViewKeyboardPromptBinding local;
+        View root;
+
+        synchronized (LOCK) {
+            local = binding;
+            if (local == null) {
+                clearLocked(null);
+
+                return;
+            }
+
+            root = local.getRoot();
+            if (root == null || !root.isAttachedToWindow()) {
+                clearLocked(local);
+
+                return;
+            }
+        }
+
+        boolean removed = false;
+        WindowManager manager = windowManager;
+
+        if (manager != null) {
+            try {
+                manager.removeViewImmediate(root);
+                removed = true;
+            } catch (IllegalArgumentException exception) {
+                Log.w(TAG, "Overlay was already detached from the window manager", exception);
+                removed = true;
+            } catch (RuntimeException exception) {
+                Log.w(TAG, "Unable to remove the keyboard prompt overlay", exception);
+            }
+        }
+
+        synchronized (LOCK) {
+            if (removed || !root.isAttachedToWindow()) {
+                clearLocked(local);
+                Log.d(TAG, "Keyboard prompt overlay dismissed");
+
+                return;
+            }
+
+            Log.w(TAG, "Overlay is still attached; keeping state for a retry");
+        }
+    }
+
+    private void clearLocked(ViewKeyboardPromptBinding expected) {
+        if (expected == null || binding == expected) {
+            binding = null;
+        }
+
+        shown = false;
+        if (active == this) {
+            active = null;
         }
     }
 

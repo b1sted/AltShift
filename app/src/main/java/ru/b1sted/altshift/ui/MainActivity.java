@@ -33,10 +33,10 @@ import ru.b1sted.altshift.databinding.ActivityMainBinding;
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
 import ru.b1sted.altshift.model.ThemeMode;
+import ru.b1sted.altshift.service.HardwareInputService;
 import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardNotification;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
-import ru.b1sted.altshift.service.KeyboardSwitchService;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 
 public final class MainActivity extends AppCompatActivity {
@@ -248,7 +248,7 @@ public final class MainActivity extends AppCompatActivity {
         binding.autoSwitchHint.setVisibility(
                 !permission && autoSwitchHintExpanded ? View.VISIBLE : View.GONE);
 
-        updateAutoSwitchService(enabled, permission);
+        ensureKeyboardMonitor(enabled);
     }
 
     private void onAutoSwitchToggled(boolean enabled) {
@@ -318,17 +318,13 @@ public final class MainActivity extends AppCompatActivity {
                 REQUEST_NOTIFICATIONS);
     }
 
-    private void updateAutoSwitchService(boolean enabled, boolean permission) {
+    private void ensureKeyboardMonitor(boolean enabled) {
         boolean canPrompt = Settings.canDrawOverlays(this)
                 || KeyboardNotification.canPost(this);
 
-        if (enabled && (permission || canPrompt)) {
-            KeyboardSwitchService.start(this);
-
-            return;
+        if (enabled || canPrompt) {
+            HardwareInputService.startKeyboardMonitor(this);
         }
-
-        KeyboardSwitchService.stop(this);
     }
 
     private void showThemeDialog() {

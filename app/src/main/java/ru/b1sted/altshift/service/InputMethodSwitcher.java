@@ -26,6 +26,7 @@ public final class InputMethodSwitcher {
 
     private static final String TAG = "AltShift";
     private static final String GBOARD_PACKAGE = "com.google.android.inputmethod.latin";
+    private static final Object SWITCH_LOCK = new Object();
 
     private InputMethodSwitcher() {
     }
@@ -76,19 +77,22 @@ public final class InputMethodSwitcher {
             return false;
         }
 
-        if (isAltShiftActive(context)) {
-            return true;
+        synchronized (SWITCH_LOCK) {
+            if (isAltShiftActive(context)) {
+                return true;
+            }
+
+            if (!isAltShiftEnabled(context)) {
+                Log.w(TAG, "AltShift is not enabled in system settings");
+
+                return false;
+            }
+
+            rememberCurrentSoftKeyboard(context);
+            Log.i(TAG, "Switching IME to AltShift");
+
+            return setDefaultInputMethodLocked(context, ALTSHIFT_IME_ID);
         }
-
-        if (!isAltShiftEnabled(context)) {
-            Log.w(TAG, "AltShift is not enabled in system settings");
-
-            return false;
-        }
-
-        rememberCurrentSoftKeyboard(context);
-
-        return setDefaultInputMethod(context, ALTSHIFT_IME_ID);
     }
 
     /**
@@ -135,14 +139,23 @@ public final class InputMethodSwitcher {
             return false;
         }
 
-        String target = resolveSoftKeyboardId(context);
-        if (target == null) {
-            Log.w(TAG, "No soft keyboard is available for automatic switching");
+        synchronized (SWITCH_LOCK) {
+            String target = resolveSoftKeyboardId(context);
+            if (target == null) {
+                Log.w(TAG, "No soft keyboard is available for automatic switching");
 
-            return false;
+                return false;
+            }
+
+            String active = readActiveInputMethod(context);
+            if (target.equals(active)) {
+                return true;
+            }
+
+            Log.i(TAG, "Switching IME to soft keyboard: " + target);
+
+            return setDefaultInputMethodLocked(context, target);
         }
-
-        return setDefaultInputMethod(context, target);
     }
 
     public static void rememberCurrentSoftKeyboard(Context context) {
@@ -197,6 +210,12 @@ public final class InputMethodSwitcher {
             return false;
         }
 
+        synchronized (SWITCH_LOCK) {
+            return setDefaultInputMethodLocked(context, imeId);
+        }
+    }
+
+    private static boolean setDefaultInputMethodLocked(Context context, String imeId) {
         try {
             boolean updated = Settings.Secure.putString(
                     context.getContentResolver(),

@@ -7,8 +7,6 @@
     <uses-permission
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <queries>
@@ -66,17 +64,6 @@
             <meta-data
                 android:name="android.view.im"
                 android:resource="@xml/method" />
-        </service>
-
-        <service
-            android:name=".service.KeyboardSwitchService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="hardware_keyboard_ime_switching" />
-
         </service>
 
         <receiver

@@ -68,11 +68,6 @@
     <string name="auto_switch_permission_required">Grant WRITE_SECURE_SETTINGS over ADB to enable auto-switching.</string>
     <string name="command_copied">Command copied to clipboard.</string>
 
-    <string name="auto_switch_channel_name">Auto-switching</string>
-    <string name="auto_switch_channel_description">Keeps seamless keyboard switching active.</string>
-    <string name="auto_switch_notification_title">Seamless auto-switching is on</string>
-    <string name="auto_switch_notification_text">Watching for hardware keyboard changes.</string>
-
     <string name="notification_channel_name">Keyboard state</string>
     <string name="notification_channel_description">Prompts when a physical keyboard is reconnected.</string>
     <string name="notification_keyboard_title">Physical keyboard reconnected</string>
