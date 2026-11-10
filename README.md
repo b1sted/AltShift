@@ -6,11 +6,14 @@
     </strong>
 </p>
 <p align="center">
+    <a href="https://github.com/b1sted/AltShift/actions/workflows/build.yml">
+        <img src="https://img.shields.io/github/actions/workflow/status/b1sted/AltShift/build.yml?branch=main&style=flat-square&label=CI%2FCD" alt="CI/CD" />
+    </a>
+    <a href="https://github.com/b1sted/AltShift/releases">
+        <img src="https://img.shields.io/github/v/release/b1sted/AltShift?style=flat-square&color=blue&label=Release" alt="Release" />
+    </a>
     <a href="#license">
         <img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License" />
-    </a>
-    <a href="#">
-        <img src="https://img.shields.io/badge/Version-0.4-green?style=flat-square" alt="Version" />
     </a>
     <a href="#">
         <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-brightgreen?style=flat-square" alt="Platform" />
