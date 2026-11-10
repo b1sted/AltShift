@@ -37,6 +37,7 @@ public final class KeyboardPromptOverlay {
     private final Runnable dismissRunnable = this::dismissSelf;
 
     private ViewKeyboardPromptBinding binding;
+    private Runnable onSwitch;
     private boolean shown;
 
     private KeyboardPromptOverlay(Context context) {
@@ -50,8 +51,15 @@ public final class KeyboardPromptOverlay {
         }
 
         Context appContext = context.getApplicationContext();
-        if (!Settings.canDrawOverlays(appContext)) {
-            Log.w(TAG, "Overlay permission is not granted");
+
+        try {
+            if (!Settings.canDrawOverlays(appContext)) {
+                Log.w(TAG, "Overlay permission is not granted");
+
+                return false;
+            }
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to verify the overlay permission", exception);
 
             return false;
         }
@@ -65,6 +73,8 @@ public final class KeyboardPromptOverlay {
         synchronized (LOCK) {
             KeyboardPromptOverlay current = active;
             if (current != null && current.shown) {
+                current.onSwitch = onSwitch;
+
                 return true;
             }
         }
@@ -98,9 +108,11 @@ public final class KeyboardPromptOverlay {
         }
     }
 
-    private boolean showInternal(Runnable onSwitch) {
+    private boolean showInternal(Runnable switchAction) {
         synchronized (LOCK) {
             if (shown) {
+                onSwitch = switchAction;
+
                 return true;
             }
 
@@ -114,10 +126,8 @@ public final class KeyboardPromptOverlay {
                 ViewKeyboardPromptBinding inflated = ViewKeyboardPromptBinding.inflate(
                         LayoutInflater.from(themedContext));
 
-                inflated.promptAction.setOnClickListener(view -> {
-                    dismissSelf();
-                    onSwitch.run();
-                });
+                onSwitch = switchAction;
+                inflated.promptAction.setOnClickListener(view -> runSwitchAction());
                 inflated.promptClose.setOnClickListener(view -> dismissSelf());
 
                 binding = inflated;
@@ -132,12 +142,22 @@ public final class KeyboardPromptOverlay {
                 Log.w(TAG, "Unable to show the keyboard prompt overlay", exception);
                 ViewKeyboardPromptBinding failed = binding;
                 binding = null;
+                onSwitch = null;
                 shown = false;
 
                 removeFailedView(failed);
 
                 return false;
             }
+        }
+    }
+
+    private void runSwitchAction() {
+        Runnable action = onSwitch;
+        dismissSelf();
+
+        if (action != null) {
+            action.run();
         }
     }
 
@@ -223,6 +243,7 @@ public final class KeyboardPromptOverlay {
         }
 
         shown = false;
+        onSwitch = null;
         if (active == this) {
             active = null;
         }

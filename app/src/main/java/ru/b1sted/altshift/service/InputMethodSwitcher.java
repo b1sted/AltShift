@@ -1,7 +1,6 @@
 package ru.b1sted.altshift.service;
 
 import android.Manifest;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.provider.Settings;
@@ -9,8 +8,6 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
-
-import androidx.core.content.ContextCompat;
 
 import java.util.List;
 
@@ -31,30 +28,27 @@ public final class InputMethodSwitcher {
     private InputMethodSwitcher() {
     }
 
+    /**
+     * Always queries the live permission state. Revocation through ADB must be
+     * visible immediately, so this value is never cached.
+     */
     public static boolean hasSecureSettingsPermission(Context context) {
         if (context == null) {
             return false;
         }
 
-        return ContextCompat.checkSelfPermission(
-                context, Manifest.permission.WRITE_SECURE_SETTINGS)
-                == PackageManager.PERMISSION_GRANTED;
+        try {
+            return context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to verify WRITE_SECURE_SETTINGS", exception);
+
+            return false;
+        }
     }
 
     public static boolean isAltShiftActive(Context context) {
-        String active = readActiveInputMethod(context);
-        if (TextUtils.isEmpty(active)) {
-            return false;
-        }
-
-        if (isAltShiftId(active)) {
-            return true;
-        }
-
-        ComponentName component = new ComponentName(context, HardwareInputService.class);
-
-        return active.contains(component.flattenToString())
-                || active.contains(component.flattenToShortString());
+        return isAltShiftId(readActiveInputMethod(context));
     }
 
     public static String readActiveInputMethod(Context context) {
@@ -216,6 +210,12 @@ public final class InputMethodSwitcher {
     }
 
     private static boolean setDefaultInputMethodLocked(Context context, String imeId) {
+        if (!hasSecureSettingsPermission(context)) {
+            Log.w(TAG, "WRITE_SECURE_SETTINGS is not granted; skipping the IME update");
+
+            return false;
+        }
+
         try {
             boolean updated = Settings.Secure.putString(
                     context.getContentResolver(),
@@ -227,7 +227,7 @@ public final class InputMethodSwitcher {
 
             return updated;
         } catch (SecurityException exception) {
-            Log.w(TAG, "WRITE_SECURE_SETTINGS is required for automatic switching", exception);
+            Log.w(TAG, "WRITE_SECURE_SETTINGS was revoked during the IME update", exception);
 
             return false;
         } catch (RuntimeException exception) {

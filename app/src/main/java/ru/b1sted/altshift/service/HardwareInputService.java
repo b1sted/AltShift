@@ -88,7 +88,7 @@ public final class HardwareInputService extends InputMethodService {
     public View onCreateInputView() {
         fallbackBinding = ViewImeFallbackBinding.inflate(getLayoutInflater());
         fallbackBinding.switchKeyboardButton.setOnClickListener(
-                view -> KeyboardMonitor.requestSoftKeyboardSwitch(true));
+                view -> requestSoftKeyboardSwitch());
         fallbackBinding.openKeyboardSettingsButton.setOnClickListener(
                 view -> openKeyboardSettings());
 
@@ -154,6 +154,63 @@ public final class HardwareInputService extends InputMethodService {
      */
     public static void startKeyboardMonitor(Context context) {
         KeyboardMonitor.ensureStarted(context);
+    }
+
+    /**
+     * Switches away from AltShift through the active IME session. The platform
+     * authorises this call for the current input method, so it needs neither
+     * WRITE_SECURE_SETTINGS nor a Settings.Secure write.
+     */
+    public boolean switchToSoftKeyboardFromIme() {
+        if (shuttingDown) {
+            return false;
+        }
+
+        if (switchToPreviousInputMethodSafely()) {
+            Log.i(TAG, "Switched to the previous input method through the IME session");
+
+            return true;
+        }
+
+        String target = InputMethodSwitcher.resolveSoftKeyboardId(this);
+        if (target == null) {
+            Log.w(TAG, "No soft keyboard is available for a native switch");
+
+            return false;
+        }
+
+        return switchInputMethodSafely(target);
+    }
+
+    private boolean switchToPreviousInputMethodSafely() {
+        try {
+            return switchToPreviousInputMethod();
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to switch to the previous input method", exception);
+
+            return false;
+        }
+    }
+
+    private boolean switchInputMethodSafely(String imeId) {
+        try {
+            switchInputMethod(imeId);
+            Log.i(TAG, "Switched to the soft keyboard through the IME session: " + imeId);
+
+            return true;
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to switch the input method through the IME session", exception);
+
+            return false;
+        }
+    }
+
+    private void requestSoftKeyboardSwitch() {
+        if (switchToSoftKeyboardFromIme()) {
+            return;
+        }
+
+        KeyboardMonitor.requestSoftKeyboardSwitch(true);
     }
 
     private void onKeyboardStateReconciled(boolean present, boolean alternative) {
@@ -307,7 +364,7 @@ public final class HardwareInputService extends InputMethodService {
         private final Handler mainHandler = new Handler(Looper.getMainLooper());
         private final HandlerThread inputThread;
         private final Handler inputHandler;
-        private final Runnable checkTask = this::reconcile;
+        private final Runnable checkTask = this::runReconcile;
         private final Runnable activateAltShiftTask = this::activateAltShift;
 
         private final InputManager.InputDeviceListener deviceListener =
@@ -451,6 +508,14 @@ public final class HardwareInputService extends InputMethodService {
             }
         }
 
+        private void runReconcile() {
+            try {
+                reconcile();
+            } catch (RuntimeException exception) {
+                Log.e(TAG, "Unable to reconcile the keyboard state", exception);
+            }
+        }
+
         private void reconcile() {
             boolean present = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(appContext);
             boolean alternative = InputMethodSwitcher.hasAlternativeInputMethod(appContext);
@@ -482,7 +547,8 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         private void applyKeyboardAttached() {
-            if (isAutoSwitchEnabled() && InputMethodSwitcher.switchToAltShift(appContext)) {
+            if (isAutoSwitchPreferenceEnabled()
+                    && InputMethodSwitcher.switchToAltShift(appContext)) {
                 mainHandler.post(KeyboardPromptOverlay::dismiss);
                 KeyboardNotification.cancel(appContext);
 
@@ -501,19 +567,24 @@ public final class HardwareInputService extends InputMethodService {
         private void applyKeyboardDetached(boolean alternative) {
             mainHandler.post(KeyboardPromptOverlay::dismiss);
 
-            if (!alternative) {
+            if (!alternative || !isAutoSwitchPreferenceEnabled()) {
                 return;
             }
 
-            if (isAutoSwitchEnabled()) {
+            HardwareInputService service = serviceRef.get();
+            if (service != null && service.switchToSoftKeyboardFromIme()) {
+                return;
+            }
+
+            if (InputMethodSwitcher.isAltShiftActive(appContext)
+                    && InputMethodSwitcher.hasSecureSettingsPermission(appContext)) {
                 InputMethodSwitcher.switchToSoftKeyboard(appContext);
             }
         }
 
-        private boolean isAutoSwitchEnabled() {
+        private boolean isAutoSwitchPreferenceEnabled() {
             try {
-                return HotkeyRepository.getInstance(appContext).isAutoSwitchEnabled()
-                        && InputMethodSwitcher.hasSecureSettingsPermission(appContext);
+                return HotkeyRepository.getInstance(appContext).isAutoSwitchEnabled();
             } catch (RuntimeException exception) {
                 Log.e(TAG, "Unable to read the auto-switch setting", exception);
 

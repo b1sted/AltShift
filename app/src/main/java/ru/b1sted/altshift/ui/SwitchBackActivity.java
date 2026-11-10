@@ -42,6 +42,7 @@ public final class SwitchBackActivity extends Activity {
 
         try {
             context.startActivity(intent);
+            Log.i(TAG, "Switch-back trampoline started");
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to open the input method picker", exception);
         }
@@ -80,6 +81,7 @@ public final class SwitchBackActivity extends Activity {
 
         pickerRequested = true;
         handler.postDelayed(this::showPicker, PICKER_DELAY_MS);
+        Log.d(TAG, "Switch-back trampoline gained focus");
     }
 
     @Override
@@ -107,12 +109,17 @@ public final class SwitchBackActivity extends Activity {
 
     private void showPicker() {
         InputMethodManager imm = getSystemService(InputMethodManager.class);
-        if (imm != null) {
-            try {
-                imm.showInputMethodPicker();
-            } catch (RuntimeException exception) {
-                Log.w(TAG, "Unable to show the input method picker", exception);
-            }
+        if (imm == null) {
+            Log.w(TAG, "InputMethodManager is unavailable for the picker");
+
+            return;
+        }
+
+        try {
+            imm.showInputMethodPicker();
+            Log.i(TAG, "System input method picker requested");
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to show the input method picker", exception);
         }
     }
 

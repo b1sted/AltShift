@@ -46,6 +46,10 @@ public final class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "AltShift";
     private static final int REQUEST_NOTIFICATIONS = 3001;
+    private static final long PERMISSION_CHECK_INTERVAL_MS = 1000L;
+
+    private final Handler permissionHandler = new Handler(Looper.getMainLooper());
+    private final Runnable permissionCheckTask = this::refreshPermissionState;
 
     private ActivityMainBinding binding;
     private HotkeyRepository repository;
@@ -53,6 +57,8 @@ public final class MainActivity extends AppCompatActivity {
     private ContentObserver imeObserver;
     private boolean openPickerOnResume;
     private boolean autoSwitchHintExpanded;
+    private boolean permissionWatching;
+    private boolean lastSecurePermission;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -116,10 +122,27 @@ public final class MainActivity extends AppCompatActivity {
         }
 
         refreshAll();
+        startPermissionWatching();
 
         if (openPickerOnResume) {
             openPickerOnResume = false;
             showImePicker();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        stopPermissionWatching();
+
+        super.onPause();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+
+        if (hasFocus && binding != null) {
+            refreshPermissionState();
         }
     }
 
@@ -137,6 +160,7 @@ public final class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        stopPermissionWatching();
         unregisterImeObserver();
 
         if (adapter != null) {
@@ -150,7 +174,7 @@ public final class MainActivity extends AppCompatActivity {
         imeObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
             @Override
             public void onChange(boolean selfChange) {
-                refreshStatus();
+                refreshAll();
             }
         };
 
@@ -215,6 +239,7 @@ public final class MainActivity extends AppCompatActivity {
     private void refreshAutoSwitch() {
         boolean enabled = repository.isAutoSwitchEnabled();
         boolean permission = InputMethodSwitcher.hasSecureSettingsPermission(this);
+        lastSecurePermission = permission;
 
         binding.autoSwitchToggle.setOnCheckedChangeListener(null);
         binding.autoSwitchToggle.setChecked(enabled);
@@ -250,6 +275,45 @@ public final class MainActivity extends AppCompatActivity {
                 !permission && autoSwitchHintExpanded ? View.VISIBLE : View.GONE);
 
         ensureKeyboardMonitor(enabled);
+    }
+
+    /**
+     * Android exposes no permission-change callback, so the dashboard checks
+     * the live grant only while it is resumed. The badge therefore reacts to
+     * ADB revocation without restarting the process.
+     */
+    private void startPermissionWatching() {
+        if (permissionWatching) {
+            return;
+        }
+
+        permissionWatching = true;
+        permissionHandler.removeCallbacks(permissionCheckTask);
+        permissionHandler.post(permissionCheckTask);
+    }
+
+    private void stopPermissionWatching() {
+        permissionWatching = false;
+        permissionHandler.removeCallbacks(permissionCheckTask);
+    }
+
+    private void refreshPermissionState() {
+        if (!permissionWatching || binding == null) {
+            return;
+        }
+
+        permissionHandler.removeCallbacks(permissionCheckTask);
+
+        try {
+            boolean permission = InputMethodSwitcher.hasSecureSettingsPermission(this);
+            if (permission != lastSecurePermission) {
+                refreshAutoSwitch();
+            }
+        } catch (RuntimeException exception) {
+            Log.e(TAG, "Unable to refresh the permission state", exception);
+        }
+
+        permissionHandler.postDelayed(permissionCheckTask, PERMISSION_CHECK_INTERVAL_MS);
     }
 
     private void onAutoSwitchToggled(boolean enabled) {
