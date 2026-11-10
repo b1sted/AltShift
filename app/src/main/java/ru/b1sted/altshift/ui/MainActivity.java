@@ -85,6 +85,7 @@ public final class MainActivity extends AppCompatActivity {
                 view -> copyAutoSwitchCommand());
         binding.developerOptionsButton.setOnClickListener(
                 view -> openDeveloperOptions());
+        binding.aboutButton.setOnClickListener(view -> AboutDialog.show(this));
         binding.themeButton.setOnClickListener(view -> showThemeDialog());
 
         openPickerOnResume = getIntent().getBooleanExtra(

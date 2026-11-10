@@ -47,29 +47,37 @@ public final class KeyboardPresenceMonitor {
             return true;
         }
 
-        return hasKeyboardInputDevice(context);
+        return findPhysicalKeyboard(context) != null;
     }
 
-    private static boolean hasKeyboardInputDevice(Context context) {
+    /**
+     * Resolves the first usable physical keyboard. Performs Binder IPC, so call
+     * it off the main thread whenever possible.
+     */
+    public static InputDevice findPhysicalKeyboard(Context context) {
+        if (context == null) {
+            return null;
+        }
+
         try {
             InputManager manager =
                     (InputManager) context.getSystemService(Context.INPUT_SERVICE);
             if (manager == null) {
-                return false;
+                return null;
             }
 
             int[] deviceIds = manager.getInputDeviceIds();
             for (int index = 0; index < deviceIds.length; index++) {
                 InputDevice device = manager.getInputDevice(deviceIds[index]);
                 if (isUsableKeyboard(device)) {
-                    return true;
+                    return device;
                 }
             }
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to enumerate input devices", exception);
         }
 
-        return false;
+        return null;
     }
 
     private static boolean isUsableKeyboard(InputDevice device) {
