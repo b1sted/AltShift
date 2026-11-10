@@ -80,6 +80,11 @@ public final class KeyboardPresenceMonitor {
         return null;
     }
 
+    /**
+     * Accepts any enabled, non-virtual alphabetic keyboard. Vendor names, bus
+     * types, and product identifiers are deliberately ignored so USB, Bluetooth,
+     * and pogo-pin keyboards behave identically across all Android devices.
+     */
     private static boolean isUsableKeyboard(InputDevice device) {
         if (device == null || device.isVirtual()) {
             return false;
@@ -89,14 +94,19 @@ public final class KeyboardPresenceMonitor {
             return false;
         }
 
+        int sources = device.getSources();
+        if ((sources & InputDevice.SOURCE_KEYBOARD) != InputDevice.SOURCE_KEYBOARD) {
+            return false;
+        }
+
+        if ((sources & InputDevice.SOURCE_TOUCHSCREEN) == InputDevice.SOURCE_TOUCHSCREEN) {
+            return false;
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             return device.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC;
         }
 
-        int sources = device.getSources();
-
-        return (sources & InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD
-                && (sources & InputDevice.SOURCE_TOUCHSCREEN)
-                != InputDevice.SOURCE_TOUCHSCREEN;
+        return true;
     }
 }

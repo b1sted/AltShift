@@ -2,6 +2,7 @@ package ru.b1sted.altshift.service;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.Insets;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Handler;
@@ -16,6 +17,8 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
 
+import androidx.annotation.RequiresApi;
+
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ViewKeyboardPromptBinding;
 
@@ -26,6 +29,7 @@ public final class KeyboardPromptOverlay {
 
     private static final String TAG = "AltShift";
     private static final long AUTO_DISMISS_MS = 12000L;
+    private static final int FALLBACK_BOTTOM_PADDING_DP = 16;
     private static final Object LOCK = new Object();
 
     @SuppressLint("StaticFieldLeak")
@@ -246,18 +250,33 @@ public final class KeyboardPromptOverlay {
 
     private int bottomInset() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                WindowMetrics metrics = windowManager.getCurrentWindowMetrics();
-                WindowInsets insets = metrics.getWindowInsets();
-
-                return insets.getInsetsIgnoringVisibility(
-                        WindowInsets.Type.navigationBars()).bottom;
-            } catch (RuntimeException exception) {
-                Log.w(TAG, "Unable to read navigation bar insets", exception);
-            }
+            return modernBottomInset();
         }
 
         return legacyNavigationBarHeight();
+    }
+
+    /**
+     * Reads the platform insets reported for the current window. Both the
+     * navigation bar and the gesture area are considered, so the capsule stays
+     * clear of three-button bars, gesture pills, and OEM-specific system bars.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
+    private int modernBottomInset() {
+        try {
+            WindowMetrics metrics = windowManager.getCurrentWindowMetrics();
+            WindowInsets insets = metrics.getWindowInsets();
+            Insets navigation = insets.getInsetsIgnoringVisibility(
+                    WindowInsets.Type.navigationBars());
+            Insets gestures = insets.getInsetsIgnoringVisibility(
+                    WindowInsets.Type.systemGestures());
+
+            return Math.max(navigation.bottom, gestures.bottom);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to read navigation bar insets", exception);
+
+            return legacyNavigationBarHeight();
+        }
     }
 
     @SuppressLint({"DiscouragedApi", "InternalInsetResource"})
@@ -265,7 +284,7 @@ public final class KeyboardPromptOverlay {
         int resourceId = context.getResources().getIdentifier(
                 "navigation_bar_height", "dimen", "android");
         if (resourceId <= 0) {
-            return 0;
+            return dp(FALLBACK_BOTTOM_PADDING_DP);
         }
 
         return context.getResources().getDimensionPixelSize(resourceId);

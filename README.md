@@ -38,7 +38,7 @@ A minimal input method service for physical keyboards on Android. AltShift maps 
 
 ## Overview
 
-AltShift is a hardware-first IME. It does not draw a full soft keyboard; it sits between the physical keyboard and the focused application, translates key events when Russian mode is active, and consumes only the combinations explicitly configured by the user. Everything else is passed through untouched. A fullscreen onboarding wizard verifies IME enablement, active selection, overlay access, and notification delivery. When a physical keyboard is attached or removed, AltShift can switch input methods automatically through the secure settings permission, or fall back to a one-tap notification prompt.
+AltShift is a hardware-first IME. It does not draw a full soft keyboard; it sits between the physical keyboard and the focused application, translates key events when Russian mode is active, and consumes only the combinations explicitly configured by the user. Everything else is passed through untouched. A fullscreen onboarding wizard verifies IME enablement, active selection, overlay access, and notification delivery. When a physical keyboard is attached or removed, AltShift can switch input methods automatically through the secure settings permission, or fall back to a one-tap notification prompt. The app relies only on public AOSP APIs and behaves identically on every Android 8.0+ device, regardless of the manufacturer or system skin.
 
 The service is written in pure Java 21 with native XML views and Material 3 components. Configuration is stored locally in `SharedPreferences` as JSON. The project has no Kotlin source files and no annotation processors.
 

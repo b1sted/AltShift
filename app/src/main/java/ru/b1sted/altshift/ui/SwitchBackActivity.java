@@ -32,6 +32,7 @@ public final class SwitchBackActivity extends Activity {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
 
+    private InputClientView inputClient;
     private boolean pickerShown;
     private boolean pickerLostFocus;
     private boolean finishScheduled;
@@ -75,6 +76,7 @@ public final class SwitchBackActivity extends Activity {
         }
 
         if (!pickerShown) {
+            focusInputClient();
             pickerShown = true;
             handler.postDelayed(this::showPicker, PICKER_DELAY_MS);
 
@@ -89,6 +91,7 @@ public final class SwitchBackActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        inputClient = null;
 
         super.onDestroy();
     }
@@ -104,9 +107,17 @@ public final class SwitchBackActivity extends Activity {
         client.setFocusable(true);
         client.setFocusableInTouchMode(true);
         root.addView(client, new FrameLayout.LayoutParams(1, 1));
+        inputClient = client;
         client.requestFocus();
 
         return root;
+    }
+
+    private void focusInputClient() {
+        InputClientView client = inputClient;
+        if (client != null && !client.hasFocus()) {
+            client.requestFocus();
+        }
     }
 
     private void showPicker() {
@@ -118,6 +129,8 @@ public final class SwitchBackActivity extends Activity {
 
             return;
         }
+
+        focusInputClient();
 
         try {
             imm.showInputMethodPicker();

@@ -18,8 +18,10 @@ import ru.b1sted.altshift.storage.HotkeyRepository;
  */
 public final class InputMethodSwitcher {
 
+    private static final String ALTSHIFT_PACKAGE = "ru.b1sted.altshift";
+
     public static final String ALTSHIFT_IME_ID =
-            "ru.b1sted.altshift/.service.HardwareInputService";
+            ALTSHIFT_PACKAGE + "/.service.HardwareInputService";
 
     private static final String TAG = "AltShift";
     private static final Object SWITCH_LOCK = new Object();
@@ -178,6 +180,8 @@ public final class InputMethodSwitcher {
             return null;
         }
 
+        // Selection order comes exclusively from the platform and the user's
+        // previous choice; no vendor or OEM package is ever preferred.
         String previous = readPreviousInputMethod(context);
         if (isUsableSoftKeyboard(previous, methods)) {
             return previous;
@@ -251,7 +255,8 @@ public final class InputMethodSwitcher {
             return false;
         }
 
-        return imeId.equals(ALTSHIFT_IME_ID) || imeId.contains("ru.b1sted.altshift");
+        return imeId.equals(ALTSHIFT_IME_ID)
+                || imeId.startsWith(ALTSHIFT_PACKAGE + "/");
     }
 
     private static List<InputMethodInfo> readEnabledInputMethods(Context context) {

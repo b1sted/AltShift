@@ -25,7 +25,7 @@
     <string name="onboarding_step_select_status_no_soft_keyboard">Enable a soft keyboard first so you can still type without the hardware keyboard.</string>
 
     <string name="onboarding_step_permissions_title">Grant permissions</string>
-    <string name="onboarding_step_permissions_description">Allow notifications and overlay access so AltShift can switch keyboards and launch apps without system prompts.</string>
+    <string name="onboarding_step_permissions_description">Allow notifications and overlay access so AltShift can switch keyboards and launch apps from background hotkeys without system prompts on devices with strict background restrictions.</string>
     <string name="onboarding_step_permissions_action">GRANT OVERLAY PERMISSION</string>
     <string name="onboarding_overlay_granted">Overlay access: granted</string>
     <string name="onboarding_overlay_pending">Overlay access: not granted</string>
@@ -47,15 +47,15 @@
     <string name="theme_dark">Dark</string>
 
     <string name="auto_switch_title">Seamless Hardware Switching (Optional)</string>
-    <string name="auto_switch_description">AltShift can switch keyboards for you the moment your keyboard cover connects or disconnects.</string>
+    <string name="auto_switch_description">AltShift can switch keyboards for you the moment your keyboard connects or disconnects.</string>
     <string name="auto_switch_status_active">Active</string>
     <string name="auto_switch_status_permission">Permission required</string>
     <string name="auto_switch_status_off">Off</string>
     <string name="auto_switch_hint_show">Learn how</string>
     <string name="auto_switch_hint_hide">Hide instructions</string>
-    <string name="auto_switch_hint_description">Want AltShift to turn on automatically the instant you connect your keyboard cover? Android protects system keyboard settings for security, so this feature requires a one-time permission granted from a computer via USB.</string>
+    <string name="auto_switch_hint_description">Want AltShift to turn on automatically the instant you connect your keyboard? Android protects system keyboard settings for security, so this feature requires a one-time permission granted from a computer via USB.</string>
     <string name="adb_step_one_title">Step 1 · Connect to a computer</string>
-    <string name="adb_step_one_body">Connect your tablet to a PC or Mac with a USB cable.</string>
+    <string name="adb_step_one_body">Connect your device to a PC or Mac with a USB cable.</string>
     <string name="adb_step_two_title">Step 2 · Enable USB debugging</string>
     <string name="adb_step_two_body">Turn on USB debugging in Developer Options.</string>
     <string name="adb_developer_options_action">Developer Options</string>
