@@ -46,10 +46,12 @@
 
         <activity
             android:name=".ui.SwitchBackActivity"
-            android:exported="true"
+            android:theme="@style/Theme.AltShift.Transparent"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
             android:excludeFromRecents="true"
             android:noHistory="true"
-            android:theme="@style/Theme.AltShift.Transparent" />
+            android:exported="false" />
 
         <service
             android:name=".service.HardwareInputService"

@@ -3,6 +3,7 @@ package ru.b1sted.altshift.service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.database.ContentObserver;
 import android.hardware.input.InputManager;
 import android.inputmethodservice.InputMethodService;
 import android.os.Handler;
@@ -356,6 +357,7 @@ public final class HardwareInputService extends InputMethodService {
     private static final class KeyboardMonitor {
 
         private static final long DEBOUNCE_MS = 150L;
+        private static final long PICKER_EVALUATION_DELAY_MS = 2500L;
         private static final Object LOCK = new Object();
 
         private static volatile KeyboardMonitor instance;
@@ -365,7 +367,8 @@ public final class HardwareInputService extends InputMethodService {
         private final HandlerThread inputThread;
         private final Handler inputHandler;
         private final Runnable checkTask = this::runReconcile;
-        private final Runnable activateAltShiftTask = this::activateAltShift;
+        private final Runnable evaluateSwitchAttemptTask = this::evaluateSwitchAttempt;
+        private final ContentObserver imeObserver;
 
         private final InputManager.InputDeviceListener deviceListener =
                 new InputManager.InputDeviceListener() {
@@ -392,6 +395,7 @@ public final class HardwareInputService extends InputMethodService {
                 new WeakReference<>(null);
         private volatile boolean keyboardPresent;
         private volatile boolean alternativeImeAvailable = true;
+        private volatile boolean pendingSwitchAttempt;
         private boolean initialized;
 
         private KeyboardMonitor(Context appContext) {
@@ -401,8 +405,15 @@ public final class HardwareInputService extends InputMethodService {
             inputThread = new HandlerThread(INPUT_THREAD_NAME);
             inputThread.start();
             inputHandler = new Handler(inputThread.getLooper());
+            imeObserver = new ContentObserver(inputHandler) {
+                @Override
+                public void onChange(boolean selfChange) {
+                    onActiveInputMethodChanged();
+                }
+            };
 
             registerDeviceListener();
+            registerImeObserver();
             inputHandler.post(checkTask);
         }
 
@@ -472,16 +483,6 @@ public final class HardwareInputService extends InputMethodService {
                     () -> monitor.switchToSoftKeyboard(showPickerOnFailure));
         }
 
-        static void requestAltShiftActivation() {
-            KeyboardMonitor monitor = instance;
-            if (monitor == null) {
-                return;
-            }
-
-            monitor.inputHandler.removeCallbacks(monitor.checkTask);
-            monitor.inputHandler.post(monitor.activateAltShiftTask);
-        }
-
         private void clearService(HardwareInputService service) {
             if (serviceRef.get() == service) {
                 serviceRef.clear();
@@ -505,6 +506,17 @@ public final class HardwareInputService extends InputMethodService {
                 manager.registerInputDeviceListener(deviceListener, inputHandler);
             } catch (RuntimeException exception) {
                 Log.e(TAG, "Unable to register the input device listener", exception);
+            }
+        }
+
+        private void registerImeObserver() {
+            try {
+                appContext.getContentResolver().registerContentObserver(
+                        Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
+                        false,
+                        imeObserver);
+            } catch (RuntimeException exception) {
+                Log.w(TAG, "Unable to observe the active input method", exception);
             }
         }
 
@@ -534,6 +546,11 @@ public final class HardwareInputService extends InputMethodService {
             if (service != null) {
                 service.onKeyboardStateReconciled(present, alternative);
             }
+
+            if (!present || InputMethodSwitcher.isAltShiftActive(appContext)) {
+                clearPendingSwitchAttempt();
+                KeyboardNotification.cancel(appContext);
+            }
         }
 
         private void applyKeyboardState(boolean present, boolean alternative) {
@@ -550,7 +567,6 @@ public final class HardwareInputService extends InputMethodService {
             if (isAutoSwitchPreferenceEnabled()
                     && InputMethodSwitcher.switchToAltShift(appContext)) {
                 mainHandler.post(KeyboardPromptOverlay::dismiss);
-                KeyboardNotification.cancel(appContext);
 
                 return;
             }
@@ -561,6 +577,7 @@ public final class HardwareInputService extends InputMethodService {
                 return;
             }
 
+            KeyboardNotification.cancel(appContext);
             mainHandler.post(this::showReconnectPrompt);
         }
 
@@ -592,19 +609,53 @@ public final class HardwareInputService extends InputMethodService {
             }
         }
 
-        private void activateAltShift() {
-            if (InputMethodSwitcher.switchToAltShift(appContext)) {
-                mainHandler.post(KeyboardPromptOverlay::dismiss);
+        private void requestPickerSwitch() {
+            armSwitchAttempt();
+            KeyboardPromptOverlay.dismiss();
+            SwitchBackActivity.start(appContext);
+        }
+
+        private void armSwitchAttempt() {
+            pendingSwitchAttempt = true;
+            inputHandler.removeCallbacks(evaluateSwitchAttemptTask);
+            inputHandler.postDelayed(evaluateSwitchAttemptTask, PICKER_EVALUATION_DELAY_MS);
+        }
+
+        private void clearPendingSwitchAttempt() {
+            pendingSwitchAttempt = false;
+            inputHandler.removeCallbacks(evaluateSwitchAttemptTask);
+        }
+
+        private void onActiveInputMethodChanged() {
+            if (InputMethodSwitcher.isAltShiftActive(appContext)) {
+                clearPendingSwitchAttempt();
                 KeyboardNotification.cancel(appContext);
 
                 return;
             }
 
-            Log.w(TAG, "Direct IME activation failed; opening the system picker");
-            mainHandler.post(() -> {
-                KeyboardPromptOverlay.dismiss();
-                SwitchBackActivity.start(appContext);
-            });
+            if (!pendingSwitchAttempt) {
+                return;
+            }
+
+            inputHandler.removeCallbacks(evaluateSwitchAttemptTask);
+            inputHandler.post(evaluateSwitchAttemptTask);
+        }
+
+        private void evaluateSwitchAttempt() {
+            if (!pendingSwitchAttempt) {
+                return;
+            }
+
+            if (!keyboardPresent || InputMethodSwitcher.isAltShiftActive(appContext)) {
+                clearPendingSwitchAttempt();
+                KeyboardNotification.cancel(appContext);
+
+                return;
+            }
+
+            clearPendingSwitchAttempt();
+            KeyboardNotification.showInactive(appContext);
         }
 
         private void switchToSoftKeyboard(boolean showPickerOnFailure) {
@@ -624,18 +675,11 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         private void showReconnectPrompt() {
-            KeyboardNotification.cancel(appContext);
-
-            boolean secure = InputMethodSwitcher.hasSecureSettingsPermission(appContext);
-            Runnable onSwitch = secure
-                    ? KeyboardMonitor::requestAltShiftActivation
-                    : () -> SwitchBackActivity.start(appContext);
-
-            if (KeyboardPromptOverlay.show(appContext, onSwitch)) {
+            if (KeyboardPromptOverlay.show(appContext, this::requestPickerSwitch)) {
                 return;
             }
 
-            KeyboardNotification.showReconnected(appContext);
+            Log.i(TAG, "Overlay unavailable; waiting for an explicit switch attempt");
         }
 
         private void showInputMethodPicker() {

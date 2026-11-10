@@ -15,21 +15,22 @@ import android.util.Log;
 import androidx.core.content.ContextCompat;
 
 import ru.b1sted.altshift.R;
-import ru.b1sted.altshift.ui.MainActivity;
+import ru.b1sted.altshift.ui.SwitchBackActivity;
 
 /**
- * Posts a low-priority prompt when a physical keyboard becomes available again.
+ * Posts a silent status notification when a deliberate switch attempt failed.
  */
 public final class KeyboardNotification {
 
     private static final String TAG = "AltShift";
     private static final String CHANNEL_ID = "keyboard_state";
     private static final int NOTIFICATION_ID = 1001;
+    private static final int REQUEST_CODE = 1002;
 
     private KeyboardNotification() {
     }
 
-    public static void showReconnected(Context context) {
+    public static void showInactive(Context context) {
         if (context == null) {
             return;
         }
@@ -50,13 +51,12 @@ public final class KeyboardNotification {
 
             ensureChannel(context, manager);
 
-            Intent intent = new Intent(context, MainActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            intent.putExtra(MainActivity.EXTRA_OPEN_IME_PICKER, true);
+            Intent intent = new Intent(context, SwitchBackActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
 
             PendingIntent pendingIntent = PendingIntent.getActivity(
                     context,
-                    0,
+                    REQUEST_CODE,
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
@@ -64,12 +64,18 @@ public final class KeyboardNotification {
                     new Notification.Builder(context, CHANNEL_ID);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
                     .setContentTitle(context.getString(
-                            R.string.notification_keyboard_title))
+                            R.string.notification_inactive_title))
                     .setContentText(context.getString(
-                            R.string.notification_keyboard_text))
+                            R.string.notification_inactive_text))
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true)
+                    .setOnlyAlertOnce(true)
+                    .setDefaults(0)
+                    .setSound(null)
+                    .setVibrate(null)
+                    .setShowWhen(false)
                     .setCategory(Notification.CATEGORY_STATUS)
+                    .setPriority(Notification.PRIORITY_LOW)
                     .addAction(new Notification.Action.Builder(
                             Icon.createWithResource(context, R.drawable.ic_notification_keyboard),
                             context.getString(R.string.notification_switch_back),
@@ -107,11 +113,6 @@ public final class KeyboardNotification {
     }
 
     private static void ensureChannel(Context context, NotificationManager manager) {
-        NotificationChannel existing = manager.getNotificationChannel(CHANNEL_ID);
-        if (existing != null) {
-            return;
-        }
-
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 context.getString(R.string.notification_channel_name),

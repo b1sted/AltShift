@@ -30,7 +30,6 @@ public final class SwitchBackActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private boolean pickerRequested;
-    private boolean pickerShown;
 
     public static void start(Context context) {
         if (context == null) {
@@ -38,7 +37,7 @@ public final class SwitchBackActivity extends Activity {
         }
 
         Intent intent = new Intent(context, SwitchBackActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
 
         try {
             context.startActivity(intent);
@@ -51,31 +50,18 @@ public final class SwitchBackActivity extends Activity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        overridePendingTransition(0, 0);
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
         setContentView(createInputClient());
-        handler.postDelayed(this::finish, SAFETY_FINISH_MS);
+        handler.postDelayed(this::finishWithoutAnimation, SAFETY_FINISH_MS);
     }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
 
-        if (!hasFocus) {
-            if (pickerRequested) {
-                pickerShown = true;
-            }
-
-            return;
-        }
-
-        if (pickerShown) {
-            finish();
-
-            return;
-        }
-
-        if (pickerRequested) {
+        if (!hasFocus || pickerRequested) {
             return;
         }
 
@@ -112,6 +98,8 @@ public final class SwitchBackActivity extends Activity {
         if (imm == null) {
             Log.w(TAG, "InputMethodManager is unavailable for the picker");
 
+            finishWithoutAnimation();
+
             return;
         }
 
@@ -121,6 +109,21 @@ public final class SwitchBackActivity extends Activity {
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to show the input method picker", exception);
         }
+
+        finishWithoutAnimation();
+    }
+
+    /**
+     * Leaves the calling application in the foreground. The system picker is an
+     * independent window, so it survives the trampoline's immediate finish.
+     */
+    private void finishWithoutAnimation() {
+        if (isFinishing()) {
+            return;
+        }
+
+        overridePendingTransition(0, 0);
+        finish();
     }
 
     private static final class InputClientView extends View {
