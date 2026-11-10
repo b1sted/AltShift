@@ -10,12 +10,13 @@ android {
         applicationId 'ru.b1sted.altshift'
         minSdk 26
         targetSdk 34
-        versionCode 6
-        versionName '0.4.0'
+        versionCode 7
+        versionName '0.4'
     }
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 
     compileOptions {

@@ -28,6 +28,9 @@ import ru.b1sted.altshift.storage.HotkeyRepository;
 
 public final class OnboardingActivity extends AppCompatActivity {
 
+    public static final String EXTRA_RERUN =
+            "ru.b1sted.altshift.extra.RERUN_ONBOARDING";
+
     private static final String TAG = "AltShift";
     private static final int REQUEST_NOTIFICATIONS = 2001;
     private static final int STEP_ENABLE = 0;
@@ -45,7 +48,8 @@ public final class OnboardingActivity extends AppCompatActivity {
 
         repository = Objects.requireNonNull(
                 HotkeyRepository.getInstance(this), "repository");
-        if (repository.isOnboardingCompleted()) {
+        boolean rerun = getIntent().getBooleanExtra(EXTRA_RERUN, false);
+        if (!rerun && repository.isOnboardingCompleted()) {
             openDashboard();
 
             return;
