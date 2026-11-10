@@ -11,7 +11,7 @@ public final class AltShiftApplication extends Application {
     public void onCreate() {
         super.onCreate();
 
-        NotificationChannels.deleteLegacy(this);
+        NotificationChannels.initialize(this);
         ThemeController.apply(this);
     }
 }

@@ -68,13 +68,13 @@
     <string name="auto_switch_permission_required">Grant WRITE_SECURE_SETTINGS over ADB to enable auto-switching.</string>
     <string name="command_copied">Command copied to clipboard.</string>
 
-    <string name="notification_channel_name">Keyboard status</string>
-    <string name="notification_channel_description">Alerts when AltShift is paused after a keyboard switch attempt.</string>
+    <string name="notification_channel_name">Keyboard Connection Alerts</string>
+    <string name="notification_channel_description">Alerts when a physical keyboard connects or when AltShift is paused</string>
     <string name="notification_inactive_title">AltShift is inactive</string>
     <string name="notification_inactive_text">Physical keyboard connected, but another on-screen keyboard is selected. Hotkeys and transliteration are paused.</string>
     <string name="notification_switch_back">Switch back</string>
-    <string name="notification_warning_channel_name">Keyboard warning</string>
-    <string name="notification_warning_channel_description">Warns when AltShift is the only enabled keyboard.</string>
+    <string name="notification_warning_channel_name">Input Safety Warnings</string>
+    <string name="notification_warning_channel_description">Alerts when no virtual on-screen keyboard is enabled in system settings</string>
     <string name="notification_no_keyboard_title">No on-screen keyboard available</string>
     <string name="notification_no_keyboard_text">AltShift is the only enabled keyboard. Enable a virtual keyboard in settings so you can type without a physical keyboard.</string>
     <string name="notification_keyboard_settings">Keyboard Settings</string>

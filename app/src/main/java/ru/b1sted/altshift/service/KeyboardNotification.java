@@ -2,7 +2,6 @@ package ru.b1sted.altshift.service;
 
 import android.Manifest;
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -48,8 +47,6 @@ public final class KeyboardNotification {
                 return;
             }
 
-            ensureChannel(context, manager);
-
             Intent intent = new Intent(context, SwitchBackActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
 
@@ -60,7 +57,7 @@ public final class KeyboardNotification {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
             Notification.Builder builder =
-                    new Notification.Builder(context, NotificationChannels.KEYBOARD_STATE);
+                    new Notification.Builder(context, NotificationChannels.KEYBOARD_ALERTS);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
                     .setContentTitle(context.getString(
                             R.string.notification_inactive_title))
@@ -71,7 +68,8 @@ public final class KeyboardNotification {
                     .setOnlyAlertOnce(true)
                     .setShowWhen(false)
                     .setCategory(Notification.CATEGORY_STATUS)
-                    .setPriority(Notification.PRIORITY_DEFAULT)
+                    .setPriority(Notification.PRIORITY_HIGH)
+                    .setDefaults(Notification.DEFAULT_ALL)
                     .addAction(new Notification.Action.Builder(
                             Icon.createWithResource(context, R.drawable.ic_notification_keyboard),
                             context.getString(R.string.notification_switch_back),
@@ -106,22 +104,6 @@ public final class KeyboardNotification {
         }
 
         return hasNotificationPermission(context);
-    }
-
-    private static void ensureChannel(Context context, NotificationManager manager) {
-        NotificationChannel channel = manager.getNotificationChannel(
-                NotificationChannels.KEYBOARD_STATE);
-        if (channel == null) {
-            channel = new NotificationChannel(
-                    NotificationChannels.KEYBOARD_STATE,
-                    context.getString(R.string.notification_channel_name),
-                    NotificationManager.IMPORTANCE_DEFAULT);
-            channel.setDescription(context.getString(
-                    R.string.notification_channel_description));
-        }
-
-        channel.enableVibration(true);
-        manager.createNotificationChannel(channel);
     }
 
     private static boolean hasNotificationPermission(Context context) {
