@@ -1,7 +1,6 @@
 package ru.b1sted.altshift.service;
 
 import android.Manifest;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.provider.Settings;
@@ -9,8 +8,6 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
-
-import androidx.core.content.ContextCompat;
 
 import java.util.List;
 
@@ -21,39 +18,38 @@ import ru.b1sted.altshift.storage.HotkeyRepository;
  */
 public final class InputMethodSwitcher {
 
+    private static final String ALTSHIFT_PACKAGE = "ru.b1sted.altshift";
+
     public static final String ALTSHIFT_IME_ID =
-            "ru.b1sted.altshift/.service.HardwareInputService";
+            ALTSHIFT_PACKAGE + "/.service.HardwareInputService";
 
     private static final String TAG = "AltShift";
-    private static final String GBOARD_PACKAGE = "com.google.android.inputmethod.latin";
+    private static final Object SWITCH_LOCK = new Object();
 
     private InputMethodSwitcher() {
     }
 
+    /**
+     * Always queries the live permission state. Revocation through ADB must be
+     * visible immediately, so this value is never cached.
+     */
     public static boolean hasSecureSettingsPermission(Context context) {
         if (context == null) {
             return false;
         }
 
-        return ContextCompat.checkSelfPermission(
-                context, Manifest.permission.WRITE_SECURE_SETTINGS)
-                == PackageManager.PERMISSION_GRANTED;
+        try {
+            return context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to verify WRITE_SECURE_SETTINGS", exception);
+
+            return false;
+        }
     }
 
     public static boolean isAltShiftActive(Context context) {
-        String active = readActiveInputMethod(context);
-        if (TextUtils.isEmpty(active)) {
-            return false;
-        }
-
-        if (isAltShiftId(active)) {
-            return true;
-        }
-
-        ComponentName component = new ComponentName(context, HardwareInputService.class);
-
-        return active.contains(component.flattenToString())
-                || active.contains(component.flattenToShortString());
+        return isAltShiftId(readActiveInputMethod(context));
     }
 
     public static String readActiveInputMethod(Context context) {
@@ -76,19 +72,46 @@ public final class InputMethodSwitcher {
             return false;
         }
 
-        if (isAltShiftActive(context)) {
-            return true;
+        synchronized (SWITCH_LOCK) {
+            if (isAltShiftActive(context)) {
+                return true;
+            }
+
+            if (!isAltShiftEnabled(context)) {
+                Log.w(TAG, "AltShift is not enabled in system settings");
+
+                return false;
+            }
+
+            rememberCurrentSoftKeyboard(context);
+            Log.i(TAG, "Switching IME to AltShift");
+
+            return setDefaultInputMethodLocked(context, ALTSHIFT_IME_ID);
         }
+    }
 
-        if (!isAltShiftEnabled(context)) {
-            Log.w(TAG, "AltShift is not enabled in system settings");
-
+    /**
+     * Returns true when at least one enabled input method is not AltShift.
+     * Without such a method, detaching the hardware keyboard would leave the user
+     * with no way to type on screen.
+     */
+    public static boolean hasAlternativeInputMethod(Context context) {
+        if (context == null) {
             return false;
         }
 
-        rememberCurrentSoftKeyboard(context);
+        List<InputMethodInfo> methods = readEnabledInputMethods(context);
+        if (methods == null) {
+            return false;
+        }
 
-        return setDefaultInputMethod(context, ALTSHIFT_IME_ID);
+        for (int index = 0; index < methods.size(); index++) {
+            if (!isAltShiftId(methods.get(index).getId())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static boolean isAltShiftEnabled(Context context) {
@@ -111,14 +134,23 @@ public final class InputMethodSwitcher {
             return false;
         }
 
-        String target = resolveSoftKeyboardId(context);
-        if (target == null) {
-            Log.w(TAG, "No soft keyboard is available for automatic switching");
+        synchronized (SWITCH_LOCK) {
+            String target = resolveSoftKeyboardId(context);
+            if (target == null) {
+                Log.w(TAG, "No soft keyboard is available for automatic switching");
 
-            return false;
+                return false;
+            }
+
+            String active = readActiveInputMethod(context);
+            if (target.equals(active)) {
+                return true;
+            }
+
+            Log.i(TAG, "Switching IME to soft keyboard: " + target);
+
+            return setDefaultInputMethodLocked(context, target);
         }
-
-        return setDefaultInputMethod(context, target);
     }
 
     public static void rememberCurrentSoftKeyboard(Context context) {
@@ -148,14 +180,11 @@ public final class InputMethodSwitcher {
             return null;
         }
 
+        // Selection order comes exclusively from the platform and the user's
+        // previous choice; no vendor or OEM package is ever preferred.
         String previous = readPreviousInputMethod(context);
         if (isUsableSoftKeyboard(previous, methods)) {
             return previous;
-        }
-
-        String gboard = findGboard(methods);
-        if (gboard != null) {
-            return gboard;
         }
 
         for (int index = 0; index < methods.size(); index++) {
@@ -168,8 +197,10 @@ public final class InputMethodSwitcher {
         return null;
     }
 
-    public static boolean setDefaultInputMethod(Context context, String imeId) {
-        if (context == null || TextUtils.isEmpty(imeId)) {
+    private static boolean setDefaultInputMethodLocked(Context context, String imeId) {
+        if (!hasSecureSettingsPermission(context)) {
+            Log.w(TAG, "WRITE_SECURE_SETTINGS is not granted; skipping the IME update");
+
             return false;
         }
 
@@ -184,7 +215,7 @@ public final class InputMethodSwitcher {
 
             return updated;
         } catch (SecurityException exception) {
-            Log.w(TAG, "WRITE_SECURE_SETTINGS is required for automatic switching", exception);
+            Log.w(TAG, "WRITE_SECURE_SETTINGS was revoked during the IME update", exception);
 
             return false;
         } catch (RuntimeException exception) {
@@ -219,23 +250,13 @@ public final class InputMethodSwitcher {
         return false;
     }
 
-    private static String findGboard(List<InputMethodInfo> methods) {
-        for (int index = 0; index < methods.size(); index++) {
-            InputMethodInfo info = methods.get(index);
-            if (GBOARD_PACKAGE.equals(info.getPackageName())) {
-                return info.getId();
-            }
-        }
-
-        return null;
-    }
-
     private static boolean isAltShiftId(String imeId) {
         if (TextUtils.isEmpty(imeId)) {
             return false;
         }
 
-        return imeId.equals(ALTSHIFT_IME_ID) || imeId.contains("ru.b1sted.altshift");
+        return imeId.equals(ALTSHIFT_IME_ID)
+                || imeId.startsWith(ALTSHIFT_PACKAGE + "/");
     }
 
     private static List<InputMethodInfo> readEnabledInputMethods(Context context) {

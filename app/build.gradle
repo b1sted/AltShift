@@ -10,12 +10,13 @@ android {
         applicationId 'ru.b1sted.altshift'
         minSdk 26
         targetSdk 34
-        versionCode 5
-        versionName '0.3.2'
+        versionCode 7
+        versionName '0.4'
     }
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 
     compileOptions {
@@ -36,7 +37,8 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }

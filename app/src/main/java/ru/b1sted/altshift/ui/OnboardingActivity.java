@@ -28,6 +28,9 @@ import ru.b1sted.altshift.storage.HotkeyRepository;
 
 public final class OnboardingActivity extends AppCompatActivity {
 
+    public static final String EXTRA_RERUN =
+            "ru.b1sted.altshift.extra.RERUN_ONBOARDING";
+
     private static final String TAG = "AltShift";
     private static final int REQUEST_NOTIFICATIONS = 2001;
     private static final int STEP_ENABLE = 0;
@@ -45,7 +48,8 @@ public final class OnboardingActivity extends AppCompatActivity {
 
         repository = Objects.requireNonNull(
                 HotkeyRepository.getInstance(this), "repository");
-        if (repository.isOnboardingCompleted()) {
+        boolean rerun = getIntent().getBooleanExtra(EXTRA_RERUN, false);
+        if (!rerun && repository.isOnboardingCompleted()) {
             openDashboard();
 
             return;
@@ -97,7 +101,7 @@ public final class OnboardingActivity extends AppCompatActivity {
     }
 
     private int firstIncompleteStep() {
-        if (!isImeEnabled()) {
+        if (!isImeEnabled() || !hasAlternativeKeyboard()) {
             return STEP_ENABLE;
         }
 
@@ -155,15 +159,24 @@ public final class OnboardingActivity extends AppCompatActivity {
     }
 
     private void refreshEnableStep(boolean imeEnabled) {
-        binding.primaryButton.setText(imeEnabled
-                ? R.string.onboarding_step_continue
-                : R.string.onboarding_step_enable_action);
-        binding.stepStatus.setText(imeEnabled
-                ? R.string.onboarding_step_enable_status_ok
-                : R.string.onboarding_step_enable_status_pending);
-        binding.stepStatus.setTextColor(getColor(imeEnabled
-                ? R.color.brand_success
-                : R.color.brand_error));
+        boolean alternativeAvailable = hasAlternativeKeyboard();
+
+        if (!imeEnabled) {
+            binding.primaryButton.setText(R.string.onboarding_step_enable_action);
+            binding.stepStatus.setText(R.string.onboarding_step_enable_status_pending);
+            binding.stepStatus.setTextColor(getColor(R.color.brand_error));
+        } else if (!alternativeAvailable) {
+            binding.primaryButton.setText(
+                    R.string.onboarding_enable_soft_keyboard_action);
+            binding.stepStatus.setText(
+                    R.string.onboarding_step_enable_status_no_soft_keyboard);
+            binding.stepStatus.setTextColor(getColor(R.color.brand_error));
+        } else {
+            binding.primaryButton.setText(R.string.onboarding_step_continue);
+            binding.stepStatus.setText(R.string.onboarding_step_enable_status_ok);
+            binding.stepStatus.setTextColor(getColor(R.color.brand_success));
+        }
+
         binding.secondaryButton.setVisibility(View.GONE);
     }
 
@@ -173,6 +186,16 @@ public final class OnboardingActivity extends AppCompatActivity {
         if (!imeEnabled) {
             binding.primaryButton.setText(R.string.onboarding_step_enable_action);
             binding.stepStatus.setText(R.string.onboarding_step_select_status_blocked);
+            binding.stepStatus.setTextColor(getColor(R.color.brand_error));
+
+            return;
+        }
+
+        if (!hasAlternativeKeyboard()) {
+            binding.primaryButton.setText(
+                    R.string.onboarding_enable_soft_keyboard_action);
+            binding.stepStatus.setText(
+                    R.string.onboarding_step_select_status_no_soft_keyboard);
             binding.stepStatus.setTextColor(getColor(R.color.brand_error));
 
             return;
@@ -243,16 +266,16 @@ public final class OnboardingActivity extends AppCompatActivity {
     private void handlePrimaryAction() {
         switch (currentStep) {
             case STEP_ENABLE -> {
-                if (isImeEnabled()) {
-                    showStep(STEP_SELECT);
+                if (!isImeEnabled() || !hasAlternativeKeyboard()) {
+                    openImeSettings();
 
                     return;
                 }
 
-                openImeSettings();
+                showStep(STEP_SELECT);
             }
             case STEP_SELECT -> {
-                if (!isImeEnabled()) {
+                if (!isImeEnabled() || !hasAlternativeKeyboard()) {
                     openImeSettings();
 
                     return;
@@ -302,6 +325,10 @@ public final class OnboardingActivity extends AppCompatActivity {
 
     private boolean isAltShiftActive() {
         return InputMethodSwitcher.isAltShiftActive(this);
+    }
+
+    private boolean hasAlternativeKeyboard() {
+        return InputMethodSwitcher.hasAlternativeInputMethod(this);
     }
 
     private boolean hasNotificationPermission() {

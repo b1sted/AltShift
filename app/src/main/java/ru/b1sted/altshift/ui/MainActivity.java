@@ -6,11 +6,14 @@ import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.database.ContentObserver;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -29,24 +32,28 @@ import ru.b1sted.altshift.databinding.ActivityMainBinding;
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
 import ru.b1sted.altshift.model.ThemeMode;
+import ru.b1sted.altshift.service.HardwareInputService;
 import ru.b1sted.altshift.service.InputMethodSwitcher;
+import ru.b1sted.altshift.service.KeyboardNotification;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
-import ru.b1sted.altshift.service.KeyboardSwitchService;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 
 public final class MainActivity extends AppCompatActivity {
 
-    public static final String EXTRA_OPEN_IME_PICKER =
-            "ru.b1sted.altshift.extra.OPEN_IME_PICKER";
-
     private static final String TAG = "AltShift";
     private static final int REQUEST_NOTIFICATIONS = 3001;
+    private static final long PERMISSION_CHECK_INTERVAL_MS = 1000L;
+
+    private final Handler permissionHandler = new Handler(Looper.getMainLooper());
+    private final Runnable permissionCheckTask = this::refreshPermissionState;
 
     private ActivityMainBinding binding;
     private HotkeyRepository repository;
     private HotkeyAdapter adapter;
-    private boolean openPickerOnResume;
+    private ContentObserver imeObserver;
     private boolean autoSwitchHintExpanded;
+    private boolean permissionWatching;
+    private boolean lastSecurePermission;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -77,10 +84,12 @@ public final class MainActivity extends AppCompatActivity {
                 view -> toggleAutoSwitchHint());
         binding.copyCommandButton.setOnClickListener(
                 view -> copyAutoSwitchCommand());
+        binding.developerOptionsButton.setOnClickListener(
+                view -> openDeveloperOptions());
+        binding.aboutButton.setOnClickListener(view -> AboutDialog.show(this));
         binding.themeButton.setOnClickListener(view -> showThemeDialog());
 
-        openPickerOnResume = getIntent().getBooleanExtra(
-                EXTRA_OPEN_IME_PICKER, false);
+        registerImeObserver();
         refreshAll();
         requestNotificationPermissionIfNeeded();
     }
@@ -106,32 +115,68 @@ public final class MainActivity extends AppCompatActivity {
         }
 
         refreshAll();
-
-        if (openPickerOnResume) {
-            openPickerOnResume = false;
-            showImePicker();
-        }
+        startPermissionWatching();
     }
 
     @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
+    protected void onPause() {
+        stopPermissionWatching();
 
-        openPickerOnResume = intent.getBooleanExtra(EXTRA_OPEN_IME_PICKER, false);
-        if (openPickerOnResume) {
-            openPickerOnResume = false;
-            showImePicker();
+        super.onPause();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+
+        if (hasFocus && binding != null) {
+            refreshPermissionState();
         }
     }
 
     @Override
     protected void onDestroy() {
+        stopPermissionWatching();
+        unregisterImeObserver();
+
         if (adapter != null) {
             adapter.shutdown();
         }
 
         super.onDestroy();
+    }
+
+    private void registerImeObserver() {
+        imeObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
+            @Override
+            public void onChange(boolean selfChange) {
+                refreshAll();
+            }
+        };
+
+        try {
+            getContentResolver().registerContentObserver(
+                    Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
+                    false,
+                    imeObserver);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to observe the active input method", exception);
+        }
+    }
+
+    private void unregisterImeObserver() {
+        ContentObserver observer = imeObserver;
+        imeObserver = null;
+
+        if (observer == null) {
+            return;
+        }
+
+        try {
+            getContentResolver().unregisterContentObserver(observer);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to stop observing the active input method", exception);
+        }
     }
 
     private void openOnboarding() {
@@ -170,6 +215,7 @@ public final class MainActivity extends AppCompatActivity {
     private void refreshAutoSwitch() {
         boolean enabled = repository.isAutoSwitchEnabled();
         boolean permission = InputMethodSwitcher.hasSecureSettingsPermission(this);
+        lastSecurePermission = permission;
 
         binding.autoSwitchToggle.setOnCheckedChangeListener(null);
         binding.autoSwitchToggle.setChecked(enabled);
@@ -204,7 +250,46 @@ public final class MainActivity extends AppCompatActivity {
         binding.autoSwitchHint.setVisibility(
                 !permission && autoSwitchHintExpanded ? View.VISIBLE : View.GONE);
 
-        updateAutoSwitchService(enabled, permission);
+        ensureKeyboardMonitor(enabled);
+    }
+
+    /**
+     * Android exposes no permission-change callback, so the dashboard checks
+     * the live grant only while it is resumed. The badge therefore reacts to
+     * ADB revocation without restarting the process.
+     */
+    private void startPermissionWatching() {
+        if (permissionWatching) {
+            return;
+        }
+
+        permissionWatching = true;
+        permissionHandler.removeCallbacks(permissionCheckTask);
+        permissionHandler.post(permissionCheckTask);
+    }
+
+    private void stopPermissionWatching() {
+        permissionWatching = false;
+        permissionHandler.removeCallbacks(permissionCheckTask);
+    }
+
+    private void refreshPermissionState() {
+        if (!permissionWatching || binding == null) {
+            return;
+        }
+
+        permissionHandler.removeCallbacks(permissionCheckTask);
+
+        try {
+            boolean permission = InputMethodSwitcher.hasSecureSettingsPermission(this);
+            if (permission != lastSecurePermission) {
+                refreshAutoSwitch();
+            }
+        } catch (RuntimeException exception) {
+            Log.e(TAG, "Unable to refresh the permission state", exception);
+        }
+
+        permissionHandler.postDelayed(permissionCheckTask, PERMISSION_CHECK_INTERVAL_MS);
     }
 
     private void onAutoSwitchToggled(boolean enabled) {
@@ -237,6 +322,26 @@ public final class MainActivity extends AppCompatActivity {
         toast(R.string.command_copied);
     }
 
+    private void openDeveloperOptions() {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
+
+        if (!tryStartActivity(intent)) {
+            toast(R.string.settings_open_failed);
+        }
+    }
+
+    private boolean tryStartActivity(Intent intent) {
+        try {
+            startActivity(intent);
+
+            return true;
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Cannot resolve activity for intent: " + intent, exception);
+
+            return false;
+        }
+    }
+
     private void requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             return;
@@ -254,14 +359,13 @@ public final class MainActivity extends AppCompatActivity {
                 REQUEST_NOTIFICATIONS);
     }
 
-    private void updateAutoSwitchService(boolean enabled, boolean permission) {
-        if (enabled && permission) {
-            KeyboardSwitchService.start(this);
+    private void ensureKeyboardMonitor(boolean enabled) {
+        boolean canPrompt = Settings.canDrawOverlays(this)
+                || KeyboardNotification.canPost(this);
 
-            return;
+        if (enabled || canPrompt) {
+            HardwareInputService.startKeyboardMonitor(this);
         }
-
-        KeyboardSwitchService.stop(this);
     }
 
     private void showThemeDialog() {
@@ -304,22 +408,6 @@ public final class MainActivity extends AppCompatActivity {
         adapter.submit(bindings);
         binding.emptyView.setVisibility(
                 bindings.length == 0 ? View.VISIBLE : View.GONE);
-    }
-
-    private void showImePicker() {
-        try {
-            InputMethodManager manager = getSystemService(InputMethodManager.class);
-            if (manager == null) {
-                toast(R.string.ime_picker_failed);
-
-                return;
-            }
-
-            manager.showInputMethodPicker();
-        } catch (RuntimeException exception) {
-            Log.e(TAG, "Unable to open the input method picker", exception);
-            toast(R.string.ime_picker_failed);
-        }
     }
 
     private void captureLanguageShortcut() {

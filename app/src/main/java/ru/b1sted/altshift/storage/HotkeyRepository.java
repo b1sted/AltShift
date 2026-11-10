@@ -85,6 +85,10 @@ public final class HotkeyRepository {
     }
 
     public void setOnboardingCompleted(boolean completed) {
+        if (onboardingCompleted == completed) {
+            return;
+        }
+
         synchronized (lock) {
             preferences.edit()
                     .putBoolean(KEY_ONBOARDING_COMPLETED, completed)
@@ -98,6 +102,10 @@ public final class HotkeyRepository {
     }
 
     public void saveAutoSwitchEnabled(boolean enabled) {
+        if (autoSwitchEnabled == enabled) {
+            return;
+        }
+
         synchronized (lock) {
             preferences.edit()
                     .putBoolean(KEY_AUTO_SWITCH_ENABLED, enabled)
@@ -111,6 +119,10 @@ public final class HotkeyRepository {
     }
 
     public void savePreviousInputMethod(String imeId) {
+        if (Objects.equals(previousInputMethod, imeId)) {
+            return;
+        }
+
         synchronized (lock) {
             SharedPreferences.Editor editor = preferences.edit();
             if (imeId == null || imeId.isEmpty()) {
@@ -130,6 +142,9 @@ public final class HotkeyRepository {
 
     public void saveThemeMode(ThemeMode mode) {
         Objects.requireNonNull(mode, "mode");
+        if (themeMode == mode) {
+            return;
+        }
 
         synchronized (lock) {
             preferences.edit()
@@ -144,6 +159,10 @@ public final class HotkeyRepository {
 
         synchronized (lock) {
             HotkeyBinding[] updated = upsertBinding(bindings, binding);
+            if (updated == bindings) {
+                return;
+            }
+
             persistBindings(updated);
             bindings = updated;
         }
@@ -154,6 +173,10 @@ public final class HotkeyRepository {
 
         synchronized (lock) {
             HotkeyBinding[] updated = removeBinding(bindings, binding);
+            if (updated == bindings) {
+                return;
+            }
+
             persistBindings(updated);
             bindings = updated;
         }
@@ -161,6 +184,9 @@ public final class HotkeyRepository {
 
     public void saveLanguageShortcut(LanguageSwitchShortcut shortcut) {
         Objects.requireNonNull(shortcut, "shortcut");
+        if (shortcut.equals(languageShortcut)) {
+            return;
+        }
 
         synchronized (lock) {
             preferences.edit()
@@ -185,6 +211,10 @@ public final class HotkeyRepository {
                     binding.isAlt(),
                     binding.isShift(),
                     binding.isMeta())) {
+                if (current[index].equals(binding)) {
+                    return current;
+                }
+
                 HotkeyBinding[] updated = current.clone();
                 updated[index] = binding;
 

@@ -64,6 +64,15 @@
                     </LinearLayout>
 
                     <ImageButton
+                        android:id="@+id/aboutButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/about_title"
+                        android:src="@drawable/ic_info"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                    <ImageButton
                         android:id="@+id/themeButton"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
@@ -167,6 +176,7 @@
                             android:id="@+id/autoSwitchHint"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
                             android:orientation="vertical"
                             android:visibility="gone">
 
@@ -174,28 +184,113 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:text="@string/auto_switch_hint_description"
-                                android:textAppearance="?attr/textAppearanceBodySmall"
+                                android:textAppearance="?attr/textAppearanceBodyMedium"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
 
-                            <TextView
-                                android:id="@+id/autoSwitchCommand"
+                            <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:background="@drawable/bg_key_badge"
-                                android:fontFamily="monospace"
-                                android:padding="12dp"
-                                android:text="@string/auto_switch_command"
-                                android:textColor="?attr/colorOnSecondaryContainer"
-                                android:textIsSelectable="true"
-                                android:textSize="12sp" />
+                                android:layout_marginTop="12dp"
+                                android:background="@drawable/bg_adb_steps"
+                                android:orientation="vertical"
+                                android:padding="16dp">
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/copyCommandButton"
-                                style="@style/Widget.Material3.Button.TextButton"
-                                android:layout_width="wrap_content"
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/adb_step_one_title"
+                                    android:textAppearance="?attr/textAppearanceTitleSmall"
+                                    android:textColor="?attr/colorOnSurface" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/adb_step_one_body"
+                                    android:textAppearance="?attr/textAppearanceBodySmall"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="16dp"
+                                    android:text="@string/adb_step_two_title"
+                                    android:textAppearance="?attr/textAppearanceTitleSmall"
+                                    android:textColor="?attr/colorOnSurface" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/adb_step_two_body"
+                                    android:textAppearance="?attr/textAppearanceBodySmall"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/developerOptionsButton"
+                                    style="@style/Widget.Material3.Button.TextButton"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="start"
+                                    android:layout_marginTop="4dp"
+                                    android:text="@string/adb_developer_options_action" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="16dp"
+                                    android:text="@string/adb_step_three_title"
+                                    android:textAppearance="?attr/textAppearanceTitleSmall"
+                                    android:textColor="?attr/colorOnSurface" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/adb_step_three_body"
+                                    android:textAppearance="?attr/textAppearanceBodySmall"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                <TextView
+                                    android:id="@+id/autoSwitchCommand"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="8dp"
+                                    android:background="@drawable/bg_key_badge"
+                                    android:fontFamily="monospace"
+                                    android:padding="12dp"
+                                    android:text="@string/auto_switch_command"
+                                    android:textColor="?attr/colorOnSecondaryContainer"
+                                    android:textIsSelectable="true"
+                                    android:textSize="12sp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/copyCommandButton"
+                                    style="@style/Widget.Material3.Button.TextButton"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="start"
+                                    android:text="@string/adb_copy_command_action" />
+
+                            </LinearLayout>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="@string/copy_command" />
+                                android:layout_marginTop="12dp"
+                                app:cardBackgroundColor="?attr/colorSecondaryContainer"
+                                app:cardCornerRadius="12dp"
+                                app:cardElevation="0dp">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:padding="12dp"
+                                    android:text="@string/adb_no_computer_notice"
+                                    android:textAppearance="?attr/textAppearanceBodySmall"
+                                    android:textColor="?attr/colorOnSecondaryContainer" />
+
+                            </com.google.android.material.card.MaterialCardView>
 
                         </LinearLayout>
 

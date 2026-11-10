@@ -12,7 +12,7 @@ public final class ModelTest {
 
     @Test
     public void hotkeyMatchesExactModifierMask() {
-        final HotkeyBinding binding = new HotkeyBinding(
+        HotkeyBinding binding = new HotkeyBinding(
                 KeyEvent.KEYCODE_A, true, false, true, false, "com.example", "Example");
 
         assertTrue(binding.matches(KeyEvent.KEYCODE_A, true, false, true, false));
@@ -22,7 +22,7 @@ public final class ModelTest {
 
     @Test
     public void defaultLanguageShortcutIsAltShift() {
-        final LanguageSwitchShortcut shortcut = LanguageSwitchShortcut.DEFAULT;
+        LanguageSwitchShortcut shortcut = LanguageSwitchShortcut.DEFAULT;
 
         assertEquals(KeyEvent.KEYCODE_SHIFT_LEFT, shortcut.keyCode());
         assertFalse(shortcut.isCtrl());
@@ -33,7 +33,7 @@ public final class ModelTest {
 
     @Test
     public void modifierOnlyHotkeyMatchesEitherModifierOrder() {
-        final HotkeyBinding binding = new HotkeyBinding(
+        HotkeyBinding binding = new HotkeyBinding(
                 KeyEvent.KEYCODE_SHIFT_LEFT, true, false, true, false,
                 "com.example", "Example");
 
@@ -44,7 +44,7 @@ public final class ModelTest {
 
     @Test
     public void languageShortcutMatchesEitherModifierOrder() {
-        final LanguageSwitchShortcut shortcut = LanguageSwitchShortcut.DEFAULT;
+        LanguageSwitchShortcut shortcut = LanguageSwitchShortcut.DEFAULT;
 
         assertTrue(shortcut.matches(KeyEvent.KEYCODE_ALT_LEFT, false, true, true, false));
         assertTrue(shortcut.matches(KeyEvent.KEYCODE_SHIFT_RIGHT, false, true, true, false));

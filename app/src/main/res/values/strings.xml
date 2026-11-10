@@ -9,10 +9,12 @@
     <string name="onboarding_step_finish">FINISH</string>
 
     <string name="onboarding_step_enable_title">Enable AltShift</string>
-    <string name="onboarding_step_enable_description">Turn on the AltShift keyboard in system settings so Android can use it.</string>
+    <string name="onboarding_step_enable_description">Turn on the AltShift keyboard in system settings so Android can use it. Keep an on-screen keyboard enabled too, so you can always type without a physical keyboard.</string>
     <string name="onboarding_step_enable_action">ENABLE IN SETTINGS</string>
+    <string name="onboarding_enable_soft_keyboard_action">ENABLE SOFT KEYBOARD</string>
     <string name="onboarding_step_enable_status_ok">AltShift is enabled.</string>
     <string name="onboarding_step_enable_status_pending">AltShift is not enabled yet.</string>
+    <string name="onboarding_step_enable_status_no_soft_keyboard">No other keyboard is enabled. Turn on an on-screen keyboard to avoid being locked out.</string>
 
     <string name="onboarding_step_select_title">Select AltShift</string>
     <string name="onboarding_step_select_description">Choose AltShift as the active input method for your hardware keyboard.</string>
@@ -20,9 +22,10 @@
     <string name="onboarding_step_select_status_ok">AltShift is the active keyboard.</string>
     <string name="onboarding_step_select_status_pending">AltShift is enabled but not selected.</string>
     <string name="onboarding_step_select_status_blocked">Enable AltShift in Step 1 first.</string>
+    <string name="onboarding_step_select_status_no_soft_keyboard">Enable a soft keyboard first so you can still type without the hardware keyboard.</string>
 
     <string name="onboarding_step_permissions_title">Grant permissions</string>
-    <string name="onboarding_step_permissions_description">Allow notifications and overlay access so AltShift can switch keyboards and launch apps without system prompts.</string>
+    <string name="onboarding_step_permissions_description">Allow notifications and overlay access so AltShift can switch keyboards and launch apps from background hotkeys without system prompts on devices with strict background restrictions.</string>
     <string name="onboarding_step_permissions_action">GRANT OVERLAY PERMISSION</string>
     <string name="onboarding_overlay_granted">Overlay access: granted</string>
     <string name="onboarding_overlay_pending">Overlay access: not granted</string>
@@ -43,33 +46,45 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
 
-    <string name="auto_switch_title">Seamless auto-switching</string>
-    <string name="auto_switch_description">Switch between AltShift and your soft keyboard automatically when a hardware keyboard is attached or removed.</string>
+    <string name="auto_switch_title">Seamless Hardware Switching (Optional)</string>
+    <string name="auto_switch_description">AltShift can switch keyboards for you the moment your keyboard connects or disconnects.</string>
     <string name="auto_switch_status_active">Active</string>
     <string name="auto_switch_status_permission">Permission required</string>
     <string name="auto_switch_status_off">Off</string>
-    <string name="auto_switch_hint_show">How to enable</string>
+    <string name="auto_switch_hint_show">Learn how</string>
     <string name="auto_switch_hint_hide">Hide instructions</string>
-    <string name="auto_switch_hint_description">Grant the secure settings permission once over ADB. AltShift will then switch input methods without notifications or pickers.</string>
+    <string name="auto_switch_hint_description">Want AltShift to turn on automatically the instant you connect your keyboard? Android protects system keyboard settings for security, so this feature requires a one-time permission granted from a computer via USB.</string>
+    <string name="adb_step_one_title">Step 1 · Connect to a computer</string>
+    <string name="adb_step_one_body">Connect your device to a PC or Mac with a USB cable.</string>
+    <string name="adb_step_two_title">Step 2 · Enable USB debugging</string>
+    <string name="adb_step_two_body">Turn on USB debugging in Developer Options.</string>
+    <string name="adb_developer_options_action">Developer Options</string>
+    <string name="adb_step_three_title">Step 3 · Run the command</string>
+    <string name="adb_step_three_body">Run this command in your computer\'s terminal:</string>
+    <string name="adb_copy_command_action">Copy Command</string>
+    <string name="adb_no_computer_notice">No computer? No problem! Without this permission, AltShift works normally and will simply show a convenient tap-to-switch bubble when your keyboard connects.</string>
     <string name="auto_switch_command">adb shell pm grant ru.b1sted.altshift android.permission.WRITE_SECURE_SETTINGS</string>
     <string name="auto_switch_command_label">AltShift ADB command</string>
     <string name="auto_switch_permission_required">Grant WRITE_SECURE_SETTINGS over ADB to enable auto-switching.</string>
-    <string name="copy_command">Copy command</string>
     <string name="command_copied">Command copied to clipboard.</string>
 
-    <string name="auto_switch_channel_name">Auto-switching</string>
-    <string name="auto_switch_channel_description">Keeps seamless keyboard switching active.</string>
-    <string name="auto_switch_notification_title">Seamless auto-switching is on</string>
-    <string name="auto_switch_notification_text">Watching for hardware keyboard changes.</string>
-
-    <string name="notification_channel_name">Keyboard state</string>
-    <string name="notification_channel_description">Prompts when a physical keyboard is reconnected.</string>
-    <string name="notification_keyboard_title">Physical keyboard reconnected</string>
-    <string name="notification_keyboard_text">Tap to switch back to AltShift.</string>
+    <string name="notification_channel_name">Keyboard Connection Alerts</string>
+    <string name="notification_channel_description">Alerts when a physical keyboard connects or when AltShift is paused</string>
+    <string name="notification_inactive_title">AltShift is inactive</string>
+    <string name="notification_inactive_text">Physical keyboard connected, but another on-screen keyboard is selected. Hotkeys and transliteration are paused.</string>
     <string name="notification_switch_back">Switch back</string>
+    <string name="notification_warning_channel_name">Input Safety Warnings</string>
+    <string name="notification_warning_channel_description">Alerts when no virtual on-screen keyboard is enabled in system settings</string>
+    <string name="notification_no_keyboard_title">No on-screen keyboard available</string>
+    <string name="notification_no_keyboard_text">AltShift is the only enabled keyboard. Enable a virtual keyboard in settings so you can type without a physical keyboard.</string>
+    <string name="notification_keyboard_settings">Keyboard Settings</string>
+    <string name="prompt_keyboard_reconnected">Keyboard reconnected</string>
+    <string name="prompt_dismiss">Dismiss</string>
 
     <string name="ime_fallback_message">Physical keyboard disconnected. Switch to an on-screen keyboard.</string>
     <string name="ime_fallback_action">Switch keyboard</string>
+    <string name="ime_fallback_no_keyboard_message">No on-screen keyboard is enabled. Enable a virtual keyboard in settings to type on screen.</string>
+    <string name="ime_fallback_settings_action">Open Keyboard Settings</string>
 
     <string name="language_section_title">Language switch</string>
     <string name="language_shortcut_label">Shortcut</string>
@@ -98,4 +113,29 @@
     <string name="settings_open_failed">Unable to open keyboard settings.</string>
     <string name="overlay_settings_failed">Unable to open overlay settings.</string>
     <string name="ime_picker_failed">Unable to open the keyboard picker.</string>
+
+    <string name="about_title">About AltShift</string>
+    <string name="about_icon">AltShift icon</string>
+    <string name="about_version_format">v%1$s (versionCode = %2$d)</string>
+    <string name="about_license">GNU General Public License v3.0</string>
+    <string name="about_author">by Nikita Mandrykin (b1sted)</string>
+    <string name="about_repository_action">GitHub Repository</string>
+    <string name="about_rerun_wizard_action">Re-run Setup Wizard</string>
+    <string name="about_repository_failed">Unable to open the GitHub repository.</string>
+    <string name="about_wizard_failed">Unable to start the setup wizard.</string>
+
+    <string name="about_diagnostics_title">Hardware diagnostics</string>
+    <string name="about_keyboard_label">Physical keyboard</string>
+    <string name="about_hardware_ids_label">Hardware IDs</string>
+    <string name="about_active_ime_label">Active IME</string>
+    <string name="about_auto_switch_label">Auto-switch mode</string>
+    <string name="about_keyboard_none">None connected</string>
+    <string name="about_hardware_ids_unknown">N/A</string>
+    <string name="about_hardware_ids_format">VID: 0x%1$04x, PID: 0x%2$04x</string>
+    <string name="about_auto_switch_autonomous">Autonomous (WRITE_SECURE_SETTINGS)</string>
+    <string name="about_auto_switch_interactive">Interactive (Dynamic Island)</string>
+    <string name="about_value_loading">Reading…</string>
+    <string name="about_value_unknown">Unknown</string>
+    <string name="about_value_unavailable">Unavailable</string>
+    <string name="about_close">Close</string>
 </resources>
