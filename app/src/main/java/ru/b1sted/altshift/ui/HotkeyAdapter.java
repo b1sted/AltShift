@@ -14,6 +14,7 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -121,6 +122,8 @@ public final class HotkeyAdapter
             return;
         }
 
+        WeakReference<HotkeyViewHolder> holderRef = new WeakReference<>(holder);
+
         iconExecutor.execute(() -> {
             Drawable icon = loadIcon(packageName);
 
@@ -136,7 +139,11 @@ public final class HotkeyAdapter
                 }
 
                 iconCache.put(packageName, icon);
-                applyIconIfBound(holder, packageName, icon);
+
+                HotkeyViewHolder currentHolder = holderRef.get();
+                if (currentHolder != null) {
+                    applyIconIfBound(currentHolder, packageName, icon);
+                }
             });
         });
     }

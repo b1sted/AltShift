@@ -121,16 +121,8 @@ public final class HardwareInputService extends InputMethodService {
             return false;
         }
 
-        if (event.getRepeatCount() == 0) {
-            if (isLanguageToggle(keyCode, event)) {
-                isRussian = !isRussian;
-
-                return true;
-            }
-
-            if (launchHotkeyApp(keyCode, event)) {
-                return true;
-            }
+        if (event.getRepeatCount() == 0 && handleShortcut(keyCode, event)) {
+            return true;
         }
 
         if (!isRussian || event.isCtrlPressed() || event.isMetaPressed()) {
@@ -148,6 +140,16 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         return super.onKeyDown(keyCode, event);
+    }
+
+    private boolean handleShortcut(int keyCode, KeyEvent event) {
+        if (isLanguageToggle(keyCode, event)) {
+            isRussian = !isRussian;
+
+            return true;
+        }
+
+        return launchHotkeyApp(keyCode, event);
     }
 
     /**

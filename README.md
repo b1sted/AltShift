@@ -10,7 +10,7 @@
         <img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License" />
     </a>
     <a href="#">
-        <img src="https://img.shields.io/badge/Version-0.3.2-green?style=flat-square" alt="Version" />
+        <img src="https://img.shields.io/badge/Version-0.4-green?style=flat-square" alt="Version" />
     </a>
     <a href="#">
         <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-brightgreen?style=flat-square" alt="Platform" />
@@ -47,10 +47,13 @@ The service is written in pure Java 21 with native XML views and Material 3 comp
 - **Zero-allocation input loop**: Static primitive-indexed lookup tables and preallocated strings; no iterators, string concatenation, or runtime allocation while typing.
 - **Fail-safe service**: External intents and input connection calls are guarded; an IME exception must never take down system input.
 - **Fullscreen onboarding**: A three-step wizard with large iconography, step indicator dots, and one-tap permission actions.
-- **Seamless auto-switching**: With `WRITE_SECURE_SETTINGS`, AltShift switches to itself when a hardware keyboard attaches and back to the previous on-screen keyboard when it detaches, without pickers or prompts.
-- **Theme modes**: Light, dark, and system themes persisted across launches and applied application-wide.
-- **Soft keyboard fallback**: Detects physical keyboard removal and switches to the preferred on-screen keyboard, with a one-tap pill and a reconnection notification as fallbacks.
+- **Autonomous ADB switching**: With `WRITE_SECURE_SETTINGS` granted over ADB, AltShift switches to itself when a hardware keyboard attaches and back to the previous on-screen keyboard when it detaches, without pickers or prompts.
+- **Dual-mode fallback**: Without the secure-settings grant, AltShift keeps working interactively through a Dynamic Island prompt, a tap-to-switch notification, and the native keyboard picker.
+- **Heads-Up alert banners**: High-importance keyboard alerts and safety warnings surface as heads-up banners, including a warning when AltShift is the only enabled keyboard.
+- **Theme modes**: Light and dark themes, plus a system default, persisted across launches and applied application-wide.
+- **About dialog**: Version details, hardware diagnostics (keyboard name, VID/PID, active IME, switch mode), repository link, and a setup-wizard rerun action.
 - **Native settings**: Material 3 dashboard, toolbar status badge, language shortcut card, auto-switch controls, hotkey list, key-capture dialog, and application picker.
+- **Zero telemetry**: No cloud services, no analytics, no background daemons, and no network permissions. Configuration stays in local `SharedPreferences`.
 - **Zero bloat**: No DI framework, no Kotlin, no Compose. `SharedPreferences` and `org.json` only.
 
 ## Requirements

@@ -72,7 +72,7 @@ public final class AppPickerDialog {
 
         dialog.show();
 
-        loadAppsAsync(context, dialog, binding, adapter);
+        loadAppsAsync(context.getApplicationContext(), dialog, binding, adapter);
     }
 
     private static void loadAppsAsync(

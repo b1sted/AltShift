@@ -193,16 +193,6 @@ public final class InputMethodSwitcher {
         return null;
     }
 
-    public static boolean setDefaultInputMethod(Context context, String imeId) {
-        if (context == null || TextUtils.isEmpty(imeId)) {
-            return false;
-        }
-
-        synchronized (SWITCH_LOCK) {
-            return setDefaultInputMethodLocked(context, imeId);
-        }
-    }
-
     private static boolean setDefaultInputMethodLocked(Context context, String imeId) {
         if (!hasSecureSettingsPermission(context)) {
             Log.w(TAG, "WRITE_SECURE_SETTINGS is not granted; skipping the IME update");

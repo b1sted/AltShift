@@ -14,7 +14,6 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -41,9 +40,6 @@ import ru.b1sted.altshift.storage.HotkeyRepository;
 
 public final class MainActivity extends AppCompatActivity {
 
-    public static final String EXTRA_OPEN_IME_PICKER =
-            "ru.b1sted.altshift.extra.OPEN_IME_PICKER";
-
     private static final String TAG = "AltShift";
     private static final int REQUEST_NOTIFICATIONS = 3001;
     private static final long PERMISSION_CHECK_INTERVAL_MS = 1000L;
@@ -55,7 +51,6 @@ public final class MainActivity extends AppCompatActivity {
     private HotkeyRepository repository;
     private HotkeyAdapter adapter;
     private ContentObserver imeObserver;
-    private boolean openPickerOnResume;
     private boolean autoSwitchHintExpanded;
     private boolean permissionWatching;
     private boolean lastSecurePermission;
@@ -94,8 +89,6 @@ public final class MainActivity extends AppCompatActivity {
         binding.aboutButton.setOnClickListener(view -> AboutDialog.show(this));
         binding.themeButton.setOnClickListener(view -> showThemeDialog());
 
-        openPickerOnResume = getIntent().getBooleanExtra(
-                EXTRA_OPEN_IME_PICKER, false);
         registerImeObserver();
         refreshAll();
         requestNotificationPermissionIfNeeded();
@@ -123,11 +116,6 @@ public final class MainActivity extends AppCompatActivity {
 
         refreshAll();
         startPermissionWatching();
-
-        if (openPickerOnResume) {
-            openPickerOnResume = false;
-            showImePicker();
-        }
     }
 
     @Override
@@ -143,18 +131,6 @@ public final class MainActivity extends AppCompatActivity {
 
         if (hasFocus && binding != null) {
             refreshPermissionState();
-        }
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-
-        openPickerOnResume = intent.getBooleanExtra(EXTRA_OPEN_IME_PICKER, false);
-        if (openPickerOnResume) {
-            openPickerOnResume = false;
-            showImePicker();
         }
     }
 
@@ -432,22 +408,6 @@ public final class MainActivity extends AppCompatActivity {
         adapter.submit(bindings);
         binding.emptyView.setVisibility(
                 bindings.length == 0 ? View.VISIBLE : View.GONE);
-    }
-
-    private void showImePicker() {
-        try {
-            InputMethodManager manager = getSystemService(InputMethodManager.class);
-            if (manager == null) {
-                toast(R.string.ime_picker_failed);
-
-                return;
-            }
-
-            manager.showInputMethodPicker();
-        } catch (RuntimeException exception) {
-            Log.e(TAG, "Unable to open the input method picker", exception);
-            toast(R.string.ime_picker_failed);
-        }
     }
 
     private void captureLanguageShortcut() {
