@@ -6,6 +6,7 @@ import android.content.res.Configuration;
 import android.database.ContentObserver;
 import android.hardware.input.InputManager;
 import android.inputmethodservice.InputMethodService;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -184,6 +185,10 @@ public final class HardwareInputService extends InputMethodService {
     }
 
     private boolean switchToPreviousInputMethodSafely() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            return false;
+        }
+
         try {
             return switchToPreviousInputMethod();
         } catch (RuntimeException exception) {
@@ -396,6 +401,7 @@ public final class HardwareInputService extends InputMethodService {
         private volatile boolean keyboardPresent;
         private volatile boolean alternativeImeAvailable = true;
         private volatile boolean pendingSwitchAttempt;
+        private boolean warningPosted;
         private boolean initialized;
 
         private KeyboardMonitor(Context appContext) {
@@ -408,7 +414,7 @@ public final class HardwareInputService extends InputMethodService {
             imeObserver = new ContentObserver(inputHandler) {
                 @Override
                 public void onChange(boolean selfChange) {
-                    onActiveInputMethodChanged();
+                    onInputMethodSettingsChanged();
                 }
             };
 
@@ -515,8 +521,12 @@ public final class HardwareInputService extends InputMethodService {
                         Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
                         false,
                         imeObserver);
+                appContext.getContentResolver().registerContentObserver(
+                        Settings.Secure.getUriFor(Settings.Secure.ENABLED_INPUT_METHODS),
+                        false,
+                        imeObserver);
             } catch (RuntimeException exception) {
-                Log.w(TAG, "Unable to observe the active input method", exception);
+                Log.w(TAG, "Unable to observe input method settings", exception);
             }
         }
 
@@ -547,10 +557,31 @@ public final class HardwareInputService extends InputMethodService {
                 service.onKeyboardStateReconciled(present, alternative);
             }
 
+            updateWarningNotification(!alternative
+                    && InputMethodSwitcher.isAltShiftEnabled(appContext));
+
             if (!present || InputMethodSwitcher.isAltShiftActive(appContext)) {
                 clearPendingSwitchAttempt();
                 KeyboardNotification.cancel(appContext);
             }
+        }
+
+        private void updateWarningNotification(boolean required) {
+            if (required) {
+                if (!warningPosted) {
+                    warningPosted = KeyboardWarningNotification.show(appContext);
+                    Log.i(TAG, "Single-keyboard warning posted");
+                }
+
+                return;
+            }
+
+            if (warningPosted) {
+                KeyboardWarningNotification.cancel(appContext);
+                Log.i(TAG, "Single-keyboard warning cleared");
+            }
+
+            warningPosted = false;
         }
 
         private void applyKeyboardState(boolean present, boolean alternative) {
@@ -626,7 +657,10 @@ public final class HardwareInputService extends InputMethodService {
             inputHandler.removeCallbacks(evaluateSwitchAttemptTask);
         }
 
-        private void onActiveInputMethodChanged() {
+        private void onInputMethodSettingsChanged() {
+            Log.d(TAG, "Input method settings changed");
+            scheduleCheckInternal();
+
             if (InputMethodSwitcher.isAltShiftActive(appContext)) {
                 clearPendingSwitchAttempt();
                 KeyboardNotification.cancel(appContext);

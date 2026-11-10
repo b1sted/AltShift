@@ -46,8 +46,8 @@ The service is written in pure Java 21 with native XML views and Material 3 comp
 - **App hotkeys**: Bind any physical key combination to an installed application.
 - **Zero-allocation input loop**: Static primitive-indexed lookup tables and preallocated strings; no iterators, string concatenation, or runtime allocation while typing.
 - **Fail-safe service**: External intents and input connection calls are guarded; an IME exception must never take down system input.
-- **Fullscreen onboarding**: A Gboard-style three-step wizard with large iconography, step indicator dots, and one-tap permission actions.
-- **Seamless auto-switching**: With `WRITE_SECURE_SETTINGS`, AltShift switches to itself when a hardware keyboard attaches and back to Gboard or the previous soft keyboard when it detaches, without pickers or prompts.
+- **Fullscreen onboarding**: A three-step wizard with large iconography, step indicator dots, and one-tap permission actions.
+- **Seamless auto-switching**: With `WRITE_SECURE_SETTINGS`, AltShift switches to itself when a hardware keyboard attaches and back to the previous on-screen keyboard when it detaches, without pickers or prompts.
 - **Theme modes**: Light, dark, and system themes persisted across launches and applied application-wide.
 - **Soft keyboard fallback**: Detects physical keyboard removal and switches to the preferred on-screen keyboard, with a one-tap pill and a reconnection notification as fallbacks.
 - **Native settings**: Material 3 dashboard, toolbar status badge, language shortcut card, auto-switch controls, hotkey list, key-capture dialog, and application picker.

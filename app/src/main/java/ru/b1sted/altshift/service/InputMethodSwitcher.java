@@ -22,7 +22,6 @@ public final class InputMethodSwitcher {
             "ru.b1sted.altshift/.service.HardwareInputService";
 
     private static final String TAG = "AltShift";
-    private static final String GBOARD_PACKAGE = "com.google.android.inputmethod.latin";
     private static final Object SWITCH_LOCK = new Object();
 
     private InputMethodSwitcher() {
@@ -184,11 +183,6 @@ public final class InputMethodSwitcher {
             return previous;
         }
 
-        String gboard = findGboard(methods);
-        if (gboard != null) {
-            return gboard;
-        }
-
         for (int index = 0; index < methods.size(); index++) {
             String id = methods.get(index).getId();
             if (!isAltShiftId(id)) {
@@ -260,17 +254,6 @@ public final class InputMethodSwitcher {
         }
 
         return false;
-    }
-
-    private static String findGboard(List<InputMethodInfo> methods) {
-        for (int index = 0; index < methods.size(); index++) {
-            InputMethodInfo info = methods.get(index);
-            if (GBOARD_PACKAGE.equals(info.getPackageName())) {
-                return info.getId();
-            }
-        }
-
-        return null;
     }
 
     private static boolean isAltShiftId(String imeId) {

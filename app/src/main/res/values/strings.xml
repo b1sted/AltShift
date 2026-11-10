@@ -9,12 +9,12 @@
     <string name="onboarding_step_finish">FINISH</string>
 
     <string name="onboarding_step_enable_title">Enable AltShift</string>
-    <string name="onboarding_step_enable_description">Turn on the AltShift keyboard in system settings so Android can use it. Keep a soft keyboard such as Gboard enabled too, so you can always type on screen.</string>
+    <string name="onboarding_step_enable_description">Turn on the AltShift keyboard in system settings so Android can use it. Keep an on-screen keyboard enabled too, so you can always type without a physical keyboard.</string>
     <string name="onboarding_step_enable_action">ENABLE IN SETTINGS</string>
     <string name="onboarding_enable_soft_keyboard_action">ENABLE SOFT KEYBOARD</string>
     <string name="onboarding_step_enable_status_ok">AltShift is enabled.</string>
     <string name="onboarding_step_enable_status_pending">AltShift is not enabled yet.</string>
-    <string name="onboarding_step_enable_status_no_soft_keyboard">No other keyboard is enabled. Turn on Gboard or another soft keyboard to avoid being locked out.</string>
+    <string name="onboarding_step_enable_status_no_soft_keyboard">No other keyboard is enabled. Turn on an on-screen keyboard to avoid being locked out.</string>
 
     <string name="onboarding_step_select_title">Select AltShift</string>
     <string name="onboarding_step_select_description">Choose AltShift as the active input method for your hardware keyboard.</string>
@@ -71,14 +71,19 @@
     <string name="notification_channel_name">Keyboard status</string>
     <string name="notification_channel_description">Alerts when AltShift is paused after a keyboard switch attempt.</string>
     <string name="notification_inactive_title">AltShift is inactive</string>
-    <string name="notification_inactive_text">Physical keyboard connected, but Gboard is selected. Hotkeys and transliteration are paused.</string>
+    <string name="notification_inactive_text">Physical keyboard connected, but another on-screen keyboard is selected. Hotkeys and transliteration are paused.</string>
     <string name="notification_switch_back">Switch back</string>
+    <string name="notification_warning_channel_name">Keyboard warning</string>
+    <string name="notification_warning_channel_description">Warns when AltShift is the only enabled keyboard.</string>
+    <string name="notification_no_keyboard_title">No on-screen keyboard available</string>
+    <string name="notification_no_keyboard_text">AltShift is the only enabled keyboard. Enable a virtual keyboard in settings so you can type without a physical keyboard.</string>
+    <string name="notification_keyboard_settings">Keyboard Settings</string>
     <string name="prompt_keyboard_reconnected">Keyboard reconnected</string>
     <string name="prompt_dismiss">Dismiss</string>
 
     <string name="ime_fallback_message">Physical keyboard disconnected. Switch to an on-screen keyboard.</string>
     <string name="ime_fallback_action">Switch keyboard</string>
-    <string name="ime_fallback_no_keyboard_message">No virtual keyboard is enabled. Please enable Gboard or another soft keyboard in settings to type on screen.</string>
+    <string name="ime_fallback_no_keyboard_message">No on-screen keyboard is enabled. Enable a virtual keyboard in settings to type on screen.</string>
     <string name="ime_fallback_settings_action">Open Keyboard Settings</string>
 
     <string name="language_section_title">Language switch</string>

@@ -20,16 +20,21 @@ import androidx.annotation.Nullable;
 
 /**
  * Transparent trampoline that opens the native input method picker.
+ * It stays registered as the active input client while the system dialog is
+ * visible, then finishes once the dialog releases focus.
  */
 public final class SwitchBackActivity extends Activity {
 
     private static final String TAG = "AltShift";
     private static final long PICKER_DELAY_MS = 200L;
+    private static final long PICKER_CLOSE_DELAY_MS = 500L;
     private static final long SAFETY_FINISH_MS = 15000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
 
-    private boolean pickerRequested;
+    private boolean pickerShown;
+    private boolean pickerLostFocus;
+    private boolean finishScheduled;
 
     public static void start(Context context) {
         if (context == null) {
@@ -61,13 +66,24 @@ public final class SwitchBackActivity extends Activity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
 
-        if (!hasFocus || pickerRequested) {
+        if (!hasFocus) {
+            // The picker is an independent system window. Keep this client
+            // alive while it is visible, otherwise the dialog is dismissed.
+            pickerLostFocus = pickerShown;
+
             return;
         }
 
-        pickerRequested = true;
-        handler.postDelayed(this::showPicker, PICKER_DELAY_MS);
-        Log.d(TAG, "Switch-back trampoline gained focus");
+        if (!pickerShown) {
+            pickerShown = true;
+            handler.postDelayed(this::showPicker, PICKER_DELAY_MS);
+
+            return;
+        }
+
+        if (pickerLostFocus) {
+            scheduleFinish();
+        }
     }
 
     @Override
@@ -78,9 +94,9 @@ public final class SwitchBackActivity extends Activity {
     }
 
     /**
-     * The platform only accepts the picker request from the active input client.
-     * This minimal editor registers the trampoline as that client without a
-     * visible text field or an on-screen keyboard.
+     * The platform ignores picker requests from clients that are not the active
+     * input client. This minimal editor registers the trampoline as that client
+     * without showing a text field or an on-screen keyboard.
      */
     private View createInputClient() {
         FrameLayout root = new FrameLayout(this);
@@ -108,15 +124,24 @@ public final class SwitchBackActivity extends Activity {
             Log.i(TAG, "System input method picker requested");
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to show the input method picker", exception);
-        }
 
-        finishWithoutAnimation();
+            finishWithoutAnimation();
+        }
     }
 
     /**
-     * Leaves the calling application in the foreground. The system picker is an
-     * independent window, so it survives the trampoline's immediate finish.
+     * Finishing as soon as focus returns can race with the dialog teardown.
+     * A short delay lets the system close the picker before this task exits.
      */
+    private void scheduleFinish() {
+        if (finishScheduled) {
+            return;
+        }
+
+        finishScheduled = true;
+        handler.postDelayed(this::finishWithoutAnimation, PICKER_CLOSE_DELAY_MS);
+    }
+
     private void finishWithoutAnimation() {
         if (isFinishing()) {
             return;
