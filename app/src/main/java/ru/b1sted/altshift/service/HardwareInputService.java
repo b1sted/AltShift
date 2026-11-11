@@ -415,7 +415,8 @@ public final class HardwareInputService extends InputMethodService {
 
         private KeyboardMonitor(Context appContext) {
             this.appContext = appContext;
-            keyboardPresent = KeyboardPresenceMonitor.isPhysicalKeyboardReported(appContext);
+            keyboardPresent = KeyboardPresenceMonitor
+                    .isKeyboardReportedByConfiguration(appContext);
 
             inputThread = new HandlerThread(INPUT_THREAD_NAME);
             inputThread.start();

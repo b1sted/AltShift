@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.database.ContentObserver;
+import android.hardware.input.InputManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -49,6 +50,23 @@ public final class MainActivity extends AppCompatActivity {
 
     private final Handler permissionHandler = new Handler(Looper.getMainLooper());
     private final Runnable permissionCheckTask = this::refreshPermissionState;
+    private final InputManager.InputDeviceListener inputDeviceListener =
+            new InputManager.InputDeviceListener() {
+                @Override
+                public void onInputDeviceAdded(int deviceId) {
+                    refreshStatus();
+                }
+
+                @Override
+                public void onInputDeviceRemoved(int deviceId) {
+                    refreshStatus();
+                }
+
+                @Override
+                public void onInputDeviceChanged(int deviceId) {
+                    refreshStatus();
+                }
+            };
     private final ExecutorService statusExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "altshift-status");
         thread.setDaemon(true);
@@ -60,6 +78,7 @@ public final class MainActivity extends AppCompatActivity {
     private HotkeyRepository repository;
     private HotkeyAdapter adapter;
     private ContentObserver imeObserver;
+    private InputManager inputManager;
     private boolean autoSwitchHintExpanded;
     private boolean permissionWatching;
     private boolean lastSecurePermission;
@@ -124,12 +143,14 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
 
+        registerInputDeviceListener();
         refreshAll();
         startPermissionWatching();
     }
 
     @Override
     protected void onPause() {
+        unregisterInputDeviceListener();
         stopPermissionWatching();
 
         super.onPause();
@@ -301,6 +322,39 @@ public final class MainActivity extends AppCompatActivity {
                 !permission && autoSwitchHintExpanded ? View.VISIBLE : View.GONE);
 
         ensureKeyboardMonitor(enabled);
+    }
+
+    private void registerInputDeviceListener() {
+        if (inputManager != null) {
+            return;
+        }
+
+        try {
+            inputManager = getSystemService(InputManager.class);
+            if (inputManager == null) {
+                return;
+            }
+
+            inputManager.registerInputDeviceListener(inputDeviceListener, permissionHandler);
+        } catch (RuntimeException exception) {
+            inputManager = null;
+            Log.w(TAG, "Unable to observe input devices", exception);
+        }
+    }
+
+    private void unregisterInputDeviceListener() {
+        InputManager manager = inputManager;
+        inputManager = null;
+
+        if (manager == null) {
+            return;
+        }
+
+        try {
+            manager.unregisterInputDeviceListener(inputDeviceListener);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to stop observing input devices", exception);
+        }
     }
 
     /**

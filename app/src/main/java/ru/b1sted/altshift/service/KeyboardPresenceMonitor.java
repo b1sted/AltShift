@@ -21,7 +21,7 @@ public final class KeyboardPresenceMonitor {
      * Cheap configuration-only check. Safe to call on the main thread because it
      * performs no Binder IPC.
      */
-    public static boolean isPhysicalKeyboardReported(Context context) {
+    public static boolean isKeyboardReportedByConfiguration(Context context) {
         if (context == null) {
             return false;
         }
@@ -38,15 +38,23 @@ public final class KeyboardPresenceMonitor {
         }
     }
 
+    /**
+     * Prefers the authoritative input-device scan and falls back to the
+     * configuration flag, which some vendor ROMs update more reliably.
+     */
     public static boolean isPhysicalKeyboardAvailable(Context context) {
         if (context == null) {
             return false;
         }
 
-        if (isPhysicalKeyboardReported(context)) {
+        if (hasKeyboardInputDevice(context)) {
             return true;
         }
 
+        return isKeyboardReportedByConfiguration(context);
+    }
+
+    public static boolean hasKeyboardInputDevice(Context context) {
         return findPhysicalKeyboard(context) != null;
     }
 
@@ -73,44 +81,34 @@ public final class KeyboardPresenceMonitor {
 
             for (int index = 0; index < deviceIds.length; index++) {
                 InputDevice device = manager.getInputDevice(deviceIds[index]);
-                if (isUsableKeyboard(device)) {
-                    return device;
+                if (device == null || device.isVirtual()) {
+                    continue;
                 }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && !device.isEnabled()) {
+                    continue;
+                }
+
+                int sources = device.getSources();
+                if ((sources & InputDevice.SOURCE_KEYBOARD) != InputDevice.SOURCE_KEYBOARD) {
+                    continue;
+                }
+
+                if ((sources & InputDevice.SOURCE_TOUCHSCREEN) == InputDevice.SOURCE_TOUCHSCREEN) {
+                    continue;
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                        && device.getKeyboardType() != InputDevice.KEYBOARD_TYPE_ALPHABETIC) {
+                    continue;
+                }
+
+                return device;
             }
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to enumerate input devices", exception);
         }
 
         return null;
-    }
-
-    /**
-     * Accepts any enabled, non-virtual alphabetic keyboard. Vendor names, bus
-     * types, and product identifiers are deliberately ignored so USB, Bluetooth,
-     * and pogo-pin keyboards behave identically across all Android devices.
-     */
-    private static boolean isUsableKeyboard(InputDevice device) {
-        if (device == null || device.isVirtual()) {
-            return false;
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && !device.isEnabled()) {
-            return false;
-        }
-
-        int sources = device.getSources();
-        if ((sources & InputDevice.SOURCE_KEYBOARD) != InputDevice.SOURCE_KEYBOARD) {
-            return false;
-        }
-
-        if ((sources & InputDevice.SOURCE_TOUCHSCREEN) == InputDevice.SOURCE_TOUCHSCREEN) {
-            return false;
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return device.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC;
-        }
-
-        return true;
     }
 }
