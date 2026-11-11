@@ -115,6 +115,10 @@ public final class InputMethodSwitcher {
     }
 
     public static boolean isAltShiftEnabled(Context context) {
+        if (context == null) {
+            return false;
+        }
+
         List<InputMethodInfo> methods = readEnabledInputMethods(context);
         if (methods == null) {
             return false;
@@ -260,6 +264,10 @@ public final class InputMethodSwitcher {
     }
 
     private static List<InputMethodInfo> readEnabledInputMethods(Context context) {
+        if (context == null) {
+            return null;
+        }
+
         try {
             InputMethodManager manager = context.getSystemService(InputMethodManager.class);
             if (manager == null) {

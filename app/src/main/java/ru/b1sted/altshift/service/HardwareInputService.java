@@ -33,6 +33,8 @@ public final class HardwareInputService extends InputMethodService {
     private static final String TAG = "AltShift";
     private static final String INPUT_THREAD_NAME = "AltShift-Input";
 
+    private static volatile boolean autoSwitchSuppressed;
+
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable refreshInputViewTask = this::refreshInputView;
 
@@ -125,7 +127,8 @@ public final class HardwareInputService extends InputMethodService {
             return true;
         }
 
-        if (!isRussian || event.isCtrlPressed() || event.isMetaPressed()) {
+        if (!isRussian || event.isCtrlPressed() || event.isAltPressed()
+                || event.isMetaPressed()) {
             return super.onKeyDown(keyCode, event);
         }
 
@@ -158,6 +161,14 @@ public final class HardwareInputService extends InputMethodService {
      */
     public static void startKeyboardMonitor(Context context) {
         KeyboardMonitor.ensureStarted(context);
+    }
+
+    /**
+     * Prevents the monitor from undoing an explicit IME selection made in the
+     * setup wizard while the wizard is in the foreground.
+     */
+    public static void setAutoSwitchSuppressed(boolean suppressed) {
+        autoSwitchSuppressed = suppressed;
     }
 
     /**
@@ -301,7 +312,8 @@ public final class HardwareInputService extends InputMethodService {
         boolean shift = event.isShiftPressed();
         boolean meta = event.isMetaPressed();
 
-        if (!ctrl && !alt && !shift && !meta) {
+        // Shift alone is normal typing (uppercase), never an app trigger.
+        if (!ctrl && !alt && !meta) {
             return false;
         }
 
@@ -340,16 +352,14 @@ public final class HardwareInputService extends InputMethodService {
 
     private boolean commitMapped(String mapped) {
         String text = Objects.requireNonNull(mapped, "mapped");
-        InputConnection connection = getCurrentInputConnection();
-
-        if (connection == null) {
-            return false;
-        }
 
         try {
-            connection.commitText(text, 1);
+            InputConnection connection = getCurrentInputConnection();
+            if (connection == null) {
+                return false;
+            }
 
-            return true;
+            return connection.commitText(text, 1);
         } catch (RuntimeException exception) {
             Log.e(TAG, "Unable to commit text", exception);
 
@@ -405,7 +415,8 @@ public final class HardwareInputService extends InputMethodService {
 
         private KeyboardMonitor(Context appContext) {
             this.appContext = appContext;
-            keyboardPresent = KeyboardPresenceMonitor.isPhysicalKeyboardReported(appContext);
+            keyboardPresent = KeyboardPresenceMonitor
+                    .isKeyboardReportedByConfiguration(appContext);
 
             inputThread = new HandlerThread(INPUT_THREAD_NAME);
             inputThread.start();
@@ -457,6 +468,9 @@ public final class HardwareInputService extends InputMethodService {
             }
 
             Context appContext = context.getApplicationContext();
+            if (appContext == null) {
+                return;
+            }
 
             synchronized (LOCK) {
                 if (instance == null) {
@@ -540,14 +554,17 @@ public final class HardwareInputService extends InputMethodService {
         private void reconcile() {
             boolean present = KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(appContext);
             boolean alternative = InputMethodSwitcher.hasAlternativeInputMethod(appContext);
-            boolean changed = !initialized || present != keyboardPresent;
+            boolean changed = !initialized
+                    || present != keyboardPresent
+                    || (!present && alternative != alternativeImeAvailable);
 
             keyboardPresent = present;
             alternativeImeAvailable = alternative;
             initialized = true;
 
             if (changed) {
-                Log.i(TAG, "Physical keyboard state changed: present=" + present);
+                Log.i(TAG, "Keyboard state changed: present=" + present
+                        + ", alternative=" + alternative);
                 applyKeyboardState(present, alternative);
             }
 
@@ -568,7 +585,9 @@ public final class HardwareInputService extends InputMethodService {
             if (required) {
                 if (!warningPosted) {
                     warningPosted = KeyboardWarningNotification.show(appContext);
-                    Log.i(TAG, "Single-keyboard warning posted");
+                    if (warningPosted) {
+                        Log.i(TAG, "Single-keyboard warning posted");
+                    }
                 }
 
                 return;
@@ -613,19 +632,37 @@ public final class HardwareInputService extends InputMethodService {
         private void applyKeyboardDetached(boolean alternative) {
             KeyboardPromptOverlay.dismissActive();
 
+            if (autoSwitchSuppressed) {
+                return;
+            }
+
             if (!alternative || !isAutoSwitchPreferenceEnabled()) {
                 return;
             }
 
             HardwareInputService service = serviceRef.get();
-            if (service != null && service.switchToSoftKeyboardFromIme()) {
+            if (service == null) {
+                switchToSoftKeyboardThroughSettings();
+
                 return;
             }
 
-            if (InputMethodSwitcher.isAltShiftActive(appContext)
-                    && InputMethodSwitcher.hasSecureSettingsPermission(appContext)) {
-                InputMethodSwitcher.switchToSoftKeyboard(appContext);
+            mainHandler.post(() -> {
+                if (service.switchToSoftKeyboardFromIme()) {
+                    return;
+                }
+
+                inputHandler.post(this::switchToSoftKeyboardThroughSettings);
+            });
+        }
+
+        private void switchToSoftKeyboardThroughSettings() {
+            if (!InputMethodSwitcher.isAltShiftActive(appContext)
+                    || !InputMethodSwitcher.hasSecureSettingsPermission(appContext)) {
+                return;
             }
+
+            InputMethodSwitcher.switchToSoftKeyboard(appContext);
         }
 
         private boolean isAutoSwitchPreferenceEnabled() {

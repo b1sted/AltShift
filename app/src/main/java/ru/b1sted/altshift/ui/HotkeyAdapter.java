@@ -16,11 +16,14 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ItemHotkeyBinding;
@@ -41,6 +44,8 @@ public final class HotkeyAdapter
     private final List<HotkeyBinding> items = new ArrayList<>();
     private final LruCache<String, Drawable> iconCache = new LruCache<>(32);
     private final Set<String> pendingIcons = new HashSet<>();
+    private final Map<String, List<WeakReference<HotkeyViewHolder>>> pendingHolders =
+            new HashMap<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService iconExecutor = Executors.newFixedThreadPool(2, runnable -> {
         Thread thread = new Thread(runnable, "altshift-icon-loader");
@@ -59,6 +64,10 @@ public final class HotkeyAdapter
 
     @SuppressLint("NotifyDataSetChanged")
     public void submit(HotkeyBinding[] bindings) {
+        if (shutDown) {
+            return;
+        }
+
         items.clear();
 
         for (int index = 0; index < bindings.length; index++) {
@@ -72,6 +81,10 @@ public final class HotkeyAdapter
         shutDown = true;
         iconExecutor.shutdownNow();
         mainHandler.removeCallbacksAndMessages(null);
+        pendingIcons.clear();
+        pendingHolders.clear();
+        iconCache.evictAll();
+        items.clear();
     }
 
     @NonNull
@@ -118,34 +131,58 @@ public final class HotkeyAdapter
     }
 
     private void requestIcon(HotkeyViewHolder holder, String packageName) {
+        if (shutDown) {
+            return;
+        }
+
+        List<WeakReference<HotkeyViewHolder>> holders = pendingHolders.get(packageName);
+        if (holders == null) {
+            holders = new ArrayList<>(2);
+            pendingHolders.put(packageName, holders);
+        }
+
+        holders.add(new WeakReference<>(holder));
+
         if (!pendingIcons.add(packageName)) {
             return;
         }
 
-        WeakReference<HotkeyViewHolder> holderRef = new WeakReference<>(holder);
+        try {
+            iconExecutor.execute(() -> {
+                Drawable icon = loadIcon(packageName);
 
-        iconExecutor.execute(() -> {
-            Drawable icon = loadIcon(packageName);
+                mainHandler.post(() -> {
+                    if (shutDown) {
+                        return;
+                    }
 
-            mainHandler.post(() -> {
-                if (shutDown) {
-                    return;
-                }
+                    pendingIcons.remove(packageName);
+                    List<WeakReference<HotkeyViewHolder>> waiting =
+                            pendingHolders.remove(packageName);
 
-                pendingIcons.remove(packageName);
+                    if (icon == null) {
+                        return;
+                    }
 
-                if (icon == null) {
-                    return;
-                }
+                    iconCache.put(packageName, icon);
 
-                iconCache.put(packageName, icon);
+                    if (waiting == null) {
+                        return;
+                    }
 
-                HotkeyViewHolder currentHolder = holderRef.get();
-                if (currentHolder != null) {
-                    applyIconIfBound(currentHolder, packageName, icon);
-                }
+                    for (int index = 0; index < waiting.size(); index++) {
+                        HotkeyViewHolder currentHolder = waiting.get(index).get();
+                        if (currentHolder != null) {
+                            applyIconIfBound(currentHolder, packageName, icon);
+                        }
+                    }
+                });
             });
-        });
+        } catch (RejectedExecutionException exception) {
+            pendingIcons.remove(packageName);
+            pendingHolders.remove(packageName);
+            Log.w(TAG, "Unable to queue icon loading", exception);
+        }
     }
 
     private Drawable loadIcon(String packageName) {

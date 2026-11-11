@@ -7,7 +7,6 @@ import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
@@ -21,6 +20,7 @@ import androidx.annotation.RequiresApi;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ViewKeyboardPromptBinding;
+import ru.b1sted.altshift.util.PermissionHelper;
 
 /**
  * Floating bottom capsule that offers a direct return to AltShift.
@@ -56,14 +56,8 @@ public final class KeyboardPromptOverlay {
 
         Context appContext = context.getApplicationContext();
 
-        try {
-            if (!Settings.canDrawOverlays(appContext)) {
-                Log.w(TAG, "Overlay permission is not granted");
-
-                return false;
-            }
-        } catch (RuntimeException exception) {
-            Log.w(TAG, "Unable to verify the overlay permission", exception);
+        if (!PermissionHelper.canDrawOverlays(appContext)) {
+            Log.w(TAG, "Overlay permission is not granted");
 
             return false;
         }
@@ -157,7 +151,12 @@ public final class KeyboardPromptOverlay {
     }
 
     private void runSwitchAction() {
-        Runnable action = onSwitch;
+        Runnable action;
+
+        synchronized (LOCK) {
+            action = onSwitch;
+        }
+
         dismiss();
 
         if (action != null) {
@@ -188,7 +187,11 @@ public final class KeyboardPromptOverlay {
      */
     public void dismiss() {
         handler.removeCallbacks(dismissRunnable);
-        shown = false;
+
+        synchronized (LOCK) {
+            shown = false;
+            onSwitch = null;
+        }
 
         if (Looper.myLooper() != Looper.getMainLooper()) {
             handler.post(this::removePromptView);

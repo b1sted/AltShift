@@ -30,16 +30,22 @@ public final class KeyCaptureDialog {
     private KeyCaptureDialog() {
     }
 
+    /**
+     * @param requireTriggerModifier rejects shortcuts that rely on Shift
+     *                              alone, because that would swallow normal
+     *                              uppercase typing.
+     */
     public static void show(
             Context context,
             @Nullable LanguageSwitchShortcut current,
-            Listener listener) {
+            Listener listener,
+            boolean requireTriggerModifier) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(listener, "listener");
 
         DialogKeyCaptureBinding binding =
                 DialogKeyCaptureBinding.inflate(LayoutInflater.from(context));
-        KeyCaptureState state = new KeyCaptureState();
+        KeyCaptureState state = new KeyCaptureState(requireTriggerModifier);
 
         if (current != null) {
             state.keyCode = current.keyCode();
@@ -61,6 +67,10 @@ public final class KeyCaptureDialog {
 
         dialog.setOnShowListener(ignored -> {
             Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            if (positive == null) {
+                return;
+            }
+
             positive.setEnabled(state.isValid());
             positive.setOnClickListener(view -> {
                 if (!state.isValid()) {
@@ -108,7 +118,7 @@ public final class KeyCaptureDialog {
 
             Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
             if (positive != null) {
-                positive.setEnabled(true);
+                positive.setEnabled(state.isValid());
             }
 
             return true;
@@ -119,14 +129,24 @@ public final class KeyCaptureDialog {
 
     private static final class KeyCaptureState {
 
+        private final boolean requireTriggerModifier;
+
         int keyCode = 0;
         boolean ctrl;
         boolean alt;
         boolean shift;
         boolean meta;
 
+        KeyCaptureState(boolean requireTriggerModifier) {
+            this.requireTriggerModifier = requireTriggerModifier;
+        }
+
         boolean isValid() {
-            return keyCode > 0;
+            if (keyCode <= 0) {
+                return false;
+            }
+
+            return !requireTriggerModifier || ctrl || alt || meta;
         }
 
         void update(int keyCode, KeyEvent event) {

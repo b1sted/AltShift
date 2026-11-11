@@ -32,4 +32,12 @@ public final class KeyLabelFormatterTest {
         assertEquals("Meta",
                 KeyLabelFormatter.format(KeyEvent.KEYCODE_META_LEFT, false, false, false, true));
     }
+
+    @Test
+    public void formatsPlainLettersAndDigits() {
+        assertEquals("A",
+                KeyLabelFormatter.format(KeyEvent.KEYCODE_A, false, false, false, false));
+        assertEquals("7",
+                KeyLabelFormatter.format(KeyEvent.KEYCODE_7, false, false, false, false));
+    }
 }

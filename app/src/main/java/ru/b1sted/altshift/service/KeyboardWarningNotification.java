@@ -1,20 +1,16 @@
 package ru.b1sted.altshift.service;
 
-import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.drawable.Icon;
-import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 
-import androidx.core.content.ContextCompat;
-
 import ru.b1sted.altshift.R;
+import ru.b1sted.altshift.util.PermissionHelper;
 
 /**
  * Warns that AltShift is the only enabled keyboard. Detaching the hardware
@@ -38,7 +34,7 @@ public final class KeyboardWarningNotification {
             return false;
         }
 
-        if (!hasNotificationPermission(context)) {
+        if (!PermissionHelper.hasNotificationPermission(context)) {
             Log.w(TAG, "Notification permission is not granted");
 
             return false;
@@ -49,6 +45,12 @@ public final class KeyboardWarningNotification {
                     (NotificationManager) context.getSystemService(
                             Context.NOTIFICATION_SERVICE);
             if (manager == null) {
+                return false;
+            }
+
+            if (!manager.areNotificationsEnabled()) {
+                Log.w(TAG, "Notifications are disabled for the application");
+
                 return false;
             }
 
@@ -108,15 +110,5 @@ public final class KeyboardWarningNotification {
                 REQUEST_CODE,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-    }
-
-    private static boolean hasNotificationPermission(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            return true;
-        }
-
-        return ContextCompat.checkSelfPermission(
-                context, Manifest.permission.POST_NOTIFICATIONS)
-                == PackageManager.PERMISSION_GRANTED;
     }
 }

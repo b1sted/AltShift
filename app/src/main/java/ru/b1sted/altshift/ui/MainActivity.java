@@ -3,10 +3,11 @@ package ru.b1sted.altshift.ui;
 import android.Manifest;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.database.ContentObserver;
+import android.hardware.input.InputManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -20,12 +21,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ActivityMainBinding;
@@ -37,6 +40,7 @@ import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardNotification;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
 import ru.b1sted.altshift.storage.HotkeyRepository;
+import ru.b1sted.altshift.util.PermissionHelper;
 
 public final class MainActivity extends AppCompatActivity {
 
@@ -46,14 +50,39 @@ public final class MainActivity extends AppCompatActivity {
 
     private final Handler permissionHandler = new Handler(Looper.getMainLooper());
     private final Runnable permissionCheckTask = this::refreshPermissionState;
+    private final InputManager.InputDeviceListener inputDeviceListener =
+            new InputManager.InputDeviceListener() {
+                @Override
+                public void onInputDeviceAdded(int deviceId) {
+                    refreshStatus();
+                }
+
+                @Override
+                public void onInputDeviceRemoved(int deviceId) {
+                    refreshStatus();
+                }
+
+                @Override
+                public void onInputDeviceChanged(int deviceId) {
+                    refreshStatus();
+                }
+            };
+    private final ExecutorService statusExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "altshift-status");
+        thread.setDaemon(true);
+
+        return thread;
+    });
 
     private ActivityMainBinding binding;
     private HotkeyRepository repository;
     private HotkeyAdapter adapter;
     private ContentObserver imeObserver;
+    private InputManager inputManager;
     private boolean autoSwitchHintExpanded;
     private boolean permissionWatching;
     private boolean lastSecurePermission;
+    private int statusGeneration;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -114,12 +143,14 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
 
+        registerInputDeviceListener();
         refreshAll();
         startPermissionWatching();
     }
 
     @Override
     protected void onPause() {
+        unregisterInputDeviceListener();
         stopPermissionWatching();
 
         super.onPause();
@@ -137,11 +168,16 @@ public final class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         stopPermissionWatching();
+        statusGeneration++;
+        statusExecutor.shutdownNow();
         unregisterImeObserver();
 
         if (adapter != null) {
             adapter.shutdown();
+            adapter = null;
         }
+
+        binding = null;
 
         super.onDestroy();
     }
@@ -186,16 +222,51 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void refreshAll() {
+        if (binding == null) {
+            return;
+        }
+
         refreshStatus();
         refreshAutoSwitch();
         refreshLanguageShortcut();
         refreshHotkeys();
     }
 
+    /**
+     * Physical device enumeration and Settings reads are Binder calls. They are
+     * resolved on a background thread, and a generation token drops stale
+     * results when several refreshes overlap.
+     */
     private void refreshStatus() {
-        boolean keyboardPresent = KeyboardPresenceMonitor
-                .isPhysicalKeyboardAvailable(this);
-        boolean imeActive = InputMethodSwitcher.isAltShiftActive(this);
+        if (binding == null) {
+            return;
+        }
+
+        int generation = ++statusGeneration;
+        Context appContext = getApplicationContext();
+
+        try {
+            statusExecutor.execute(() -> {
+                try {
+                    boolean keyboardPresent = KeyboardPresenceMonitor
+                            .isPhysicalKeyboardAvailable(appContext);
+                    boolean imeActive = InputMethodSwitcher.isAltShiftActive(appContext);
+
+                    runOnUiThread(() -> applyStatus(
+                            generation, keyboardPresent, imeActive));
+                } catch (RuntimeException exception) {
+                    Log.e(TAG, "Unable to refresh the status badge", exception);
+                }
+            });
+        } catch (RejectedExecutionException exception) {
+            Log.w(TAG, "Status refresh rejected during teardown", exception);
+        }
+    }
+
+    private void applyStatus(int generation, boolean keyboardPresent, boolean imeActive) {
+        if (generation != statusGeneration || binding == null) {
+            return;
+        }
 
         String keyboardStatus = getString(keyboardPresent
                 ? R.string.status_keyboard_connected
@@ -253,10 +324,43 @@ public final class MainActivity extends AppCompatActivity {
         ensureKeyboardMonitor(enabled);
     }
 
+    private void registerInputDeviceListener() {
+        if (inputManager != null) {
+            return;
+        }
+
+        try {
+            inputManager = getSystemService(InputManager.class);
+            if (inputManager == null) {
+                return;
+            }
+
+            inputManager.registerInputDeviceListener(inputDeviceListener, permissionHandler);
+        } catch (RuntimeException exception) {
+            inputManager = null;
+            Log.w(TAG, "Unable to observe input devices", exception);
+        }
+    }
+
+    private void unregisterInputDeviceListener() {
+        InputManager manager = inputManager;
+        inputManager = null;
+
+        if (manager == null) {
+            return;
+        }
+
+        try {
+            manager.unregisterInputDeviceListener(inputDeviceListener);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to stop observing input devices", exception);
+        }
+    }
+
     /**
-     * Android exposes no permission-change callback, so the dashboard checks
-     * the live grant only while it is resumed. The badge therefore reacts to
-     * ADB revocation without restarting the process.
+     * Android exposes no permission-change callback. The live grant is checked
+     * once per second only while the dashboard is resumed, so an ADB grant or
+     * revocation is reflected without restarting the process.
      */
     private void startPermissionWatching() {
         if (permissionWatching) {
@@ -318,8 +422,13 @@ public final class MainActivity extends AppCompatActivity {
         ClipData clip = ClipData.newPlainText(
                 getString(R.string.auto_switch_command_label),
                 getString(R.string.auto_switch_command));
-        clipboard.setPrimaryClip(clip);
-        toast(R.string.command_copied);
+
+        try {
+            clipboard.setPrimaryClip(clip);
+            toast(R.string.command_copied);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to copy the ADB command", exception);
+        }
     }
 
     private void openDeveloperOptions() {
@@ -347,9 +456,7 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
 
-        if (ContextCompat.checkSelfPermission(
-                this, Manifest.permission.POST_NOTIFICATIONS)
-                == PackageManager.PERMISSION_GRANTED) {
+        if (PermissionHelper.hasNotificationPermission(this)) {
             return;
         }
 
@@ -360,7 +467,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void ensureKeyboardMonitor(boolean enabled) {
-        boolean canPrompt = Settings.canDrawOverlays(this)
+        boolean canPrompt = PermissionHelper.canDrawOverlays(this)
                 || KeyboardNotification.canPost(this);
 
         if (enabled || canPrompt) {
@@ -413,7 +520,7 @@ public final class MainActivity extends AppCompatActivity {
     private void captureLanguageShortcut() {
         LanguageSwitchShortcut current = repository.getLanguageShortcut();
 
-        KeyCaptureDialog.show(this, current, this::saveLanguageShortcut);
+        KeyCaptureDialog.show(this, current, this::saveLanguageShortcut, true);
     }
 
     private void saveLanguageShortcut(
@@ -430,7 +537,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void addHotkey() {
-        KeyCaptureDialog.show(this, null, this::showAppPicker);
+        KeyCaptureDialog.show(this, null, this::showAppPicker, true);
     }
 
     private void showAppPicker(

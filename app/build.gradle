@@ -2,6 +2,8 @@ plugins {
     id 'com.android.application'
 }
 
+def releaseSigningConfigured = System.getenv("KEYSTORE_FILE") != null
+
 android {
     namespace 'ru.b1sted.altshift'
     compileSdk 34
@@ -10,8 +12,8 @@ android {
         applicationId 'ru.b1sted.altshift'
         minSdk 26
         targetSdk 34
-        versionCode 7
-        versionName '0.4'
+        versionCode 8
+        versionName '0.4.1'
     }
 
     buildFeatures {
@@ -26,7 +28,7 @@ android {
 
     signingConfigs {
         release {
-            if (System.getenv("KEYSTORE_FILE") != null) {
+            if (releaseSigningConfigured) {
                 storeFile file(System.getenv("KEYSTORE_FILE"))
                 storePassword System.getenv("KEYSTORE_PASSWORD")
                 keyAlias System.getenv("KEY_ALIAS")
@@ -40,7 +42,12 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+
+            // Local builds stay unsigned; tagged CI builds sign with the
+            // keystore injected through the environment.
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
@@ -52,7 +59,10 @@ android {
     applicationVariants.all { variant ->
         variant.outputs.all {
             def type = variant.buildType.name == 'release' ? '' : "-${variant.buildType.name}"
-            outputFileName = "AltShift-v${defaultConfig.versionName}${type}.apk"
+            def unsigned = variant.buildType.name == 'release' && !releaseSigningConfigured
+                    ? '-unsigned'
+                    : ''
+            outputFileName = "AltShift-v${defaultConfig.versionName}${type}${unsigned}.apk"
         }
     }
 }
