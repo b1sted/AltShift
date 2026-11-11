@@ -3,10 +3,13 @@ package ru.b1sted.altshift.ui;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.ContentObserver;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
@@ -41,6 +44,18 @@ public final class OnboardingActivity extends AppCompatActivity {
     private static final int STEP_ENABLE = 0;
     private static final int STEP_SELECT = 1;
     private static final int STEP_PERMISSIONS = 2;
+
+    private final ContentObserver inputMethodObserver = new ContentObserver(
+            new Handler(Looper.getMainLooper())) {
+        @Override
+        public void onChange(boolean selfChange) {
+            if (binding == null) {
+                return;
+            }
+
+            refreshState();
+        }
+    };
 
     private ActivityOnboardingBinding binding;
     private HotkeyRepository repository;
@@ -88,6 +103,34 @@ public final class OnboardingActivity extends AppCompatActivity {
         super.onResume();
 
         if (binding == null) {
+            return;
+        }
+
+        refreshState();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        getContentResolver().registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
+                false,
+                inputMethodObserver);
+    }
+
+    @Override
+    protected void onStop() {
+        getContentResolver().unregisterContentObserver(inputMethodObserver);
+
+        super.onStop();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+
+        if (!hasFocus || binding == null) {
             return;
         }
 
