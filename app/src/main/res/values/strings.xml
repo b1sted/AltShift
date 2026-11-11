@@ -117,6 +117,7 @@
     <string name="select_app_title">Select application</string>
     <string name="no_launchable_apps">No launchable applications found.</string>
     <string name="app_picker_failed">Unable to load installed applications.</string>
+    <string name="app_picker_retry">Retry</string>
 
     <string name="shortcut_saved">Shortcut saved.</string>
     <string name="shortcut_deleted">Shortcut deleted.</string>

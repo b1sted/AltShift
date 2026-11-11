@@ -13,6 +13,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
+import android.view.Window;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
@@ -36,6 +38,8 @@ import ru.b1sted.altshift.databinding.ItemAppPickerBinding;
 public final class AppPickerDialog {
 
     private static final String TAG = "AltShift";
+
+    private static final long LIST_FADE_DURATION_MS = 150L;
 
     public interface Listener {
         void onSelected(String appName, String packageName);
@@ -65,76 +69,185 @@ public final class AppPickerDialog {
             dialog.dismiss();
         });
 
-        binding.appList.setLayoutManager(new LinearLayoutManager(context));
-        binding.appList.setAdapter(adapter);
-        binding.progress.setVisibility(View.VISIBLE);
-        binding.emptyView.setVisibility(View.GONE);
-
-        dialog.show();
-
-        loadAppsAsync(context.getApplicationContext(), dialog, binding, adapter);
+        PickerSession session = new PickerSession(
+                context.getApplicationContext(), dialog, binding, adapter);
+        session.show();
     }
 
-    private static void loadAppsAsync(
-            Context context,
-            AlertDialog dialog,
-            DialogAppPickerBinding binding,
-            AppListAdapter adapter) {
-        Handler mainHandler = new Handler(Looper.getMainLooper());
-        ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
+    /**
+     * Keeps the dialog alive while an OEM privacy manager resolves package access.
+     *
+     * <p>The first package query on some ROMs returns an empty list because the
+     * system shows its own permission prompt. Once that prompt is dismissed the
+     * dialog window regains focus, which is the signal to query again.
+     */
+    private static final class PickerSession {
+
+        private final Context context;
+        private final AlertDialog dialog;
+        private final DialogAppPickerBinding binding;
+        private final AppListAdapter adapter;
+        private final Handler mainHandler = new Handler(Looper.getMainLooper());
+        private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "altshift-app-picker");
             thread.setDaemon(true);
 
             return thread;
         });
+        private final ViewTreeObserver.OnWindowFocusChangeListener focusChangeListener =
+                this::onWindowFocusChanged;
 
-        executor.execute(() -> {
-            try {
-                List<AppEntry> apps = loadLaunchableApps(context);
+        private ViewTreeObserver windowObserver;
+        private boolean loading;
+        private boolean appsAvailable;
+        private boolean released;
 
-                mainHandler.post(() -> publishApps(dialog, binding, adapter, apps));
-            } catch (RuntimeException exception) {
-                Log.e(TAG, "Unable to query launchable applications", exception);
+        private PickerSession(
+                Context context,
+                AlertDialog dialog,
+                DialogAppPickerBinding binding,
+                AppListAdapter adapter) {
+            this.context = context;
+            this.dialog = dialog;
+            this.binding = binding;
+            this.adapter = adapter;
+        }
 
-                mainHandler.post(() -> showEmptyState(
-                        dialog, binding, R.string.app_picker_failed));
-            } finally {
-                executor.shutdown();
+        private void show() {
+            binding.appList.setLayoutManager(new LinearLayoutManager(context));
+            binding.appList.setAdapter(adapter);
+            binding.retryButton.setOnClickListener(view -> loadApps());
+
+            dialog.setOnShowListener(ignored -> {
+                attachFocusListener();
+                loadApps();
+            });
+            dialog.setOnDismissListener(ignored -> release());
+
+            showLoadingState();
+            dialog.show();
+        }
+
+        private void attachFocusListener() {
+            Window window = dialog.getWindow();
+            if (window == null) {
+                return;
             }
-        });
-    }
 
-    private static void publishApps(
-            AlertDialog dialog,
-            DialogAppPickerBinding binding,
-            AppListAdapter adapter,
-            List<AppEntry> apps) {
-        if (!dialog.isShowing()) {
-            return;
+            View decorView = window.getDecorView();
+            windowObserver = decorView.getViewTreeObserver();
+            windowObserver.addOnWindowFocusChangeListener(focusChangeListener);
         }
 
-        binding.progress.setVisibility(View.GONE);
+        private void onWindowFocusChanged(boolean hasFocus) {
+            if (!hasFocus || released || loading || appsAvailable) {
+                return;
+            }
 
-        if (apps.isEmpty()) {
-            showEmptyState(dialog, binding, R.string.no_launchable_apps);
+            if (binding.emptyState.getVisibility() != View.VISIBLE) {
+                return;
+            }
 
-            return;
+            Log.i(TAG, "App picker regained focus with an empty list; retrying package query");
+            loadApps();
         }
 
-        adapter.submit(apps);
-        binding.appList.setVisibility(View.VISIBLE);
-    }
+        private void loadApps() {
+            if (released || loading) {
+                return;
+            }
 
-    private static void showEmptyState(
-            AlertDialog dialog, DialogAppPickerBinding binding, int messageResId) {
-        if (!dialog.isShowing()) {
-            return;
+            loading = true;
+            showLoadingState();
+
+            executor.execute(() -> {
+                List<AppEntry> apps;
+                try {
+                    apps = loadLaunchableApps(context);
+                } catch (RuntimeException exception) {
+                    Log.e(TAG, "Unable to query launchable applications", exception);
+                    mainHandler.post(() -> onLoadFailed(R.string.app_picker_failed));
+
+                    return;
+                }
+
+                mainHandler.post(() -> onAppsLoaded(apps));
+            });
         }
 
-        binding.progress.setVisibility(View.GONE);
-        binding.appList.setVisibility(View.GONE);
-        binding.emptyView.setText(messageResId);
-        binding.emptyView.setVisibility(View.VISIBLE);
+        private void onAppsLoaded(List<AppEntry> apps) {
+            loading = false;
+            if (released) {
+                return;
+            }
+
+            if (apps.isEmpty()) {
+                showEmptyState(R.string.no_launchable_apps);
+
+                return;
+            }
+
+            appsAvailable = true;
+            adapter.submit(apps);
+            showApps();
+        }
+
+        private void onLoadFailed(int messageResId) {
+            loading = false;
+            if (released) {
+                return;
+            }
+
+            showEmptyState(messageResId);
+        }
+
+        private void showLoadingState() {
+            binding.progress.setVisibility(View.VISIBLE);
+            binding.emptyState.setVisibility(View.GONE);
+
+            binding.appList.animate().cancel();
+            binding.appList.setAlpha(0f);
+            binding.appList.setVisibility(View.GONE);
+        }
+
+        private void showEmptyState(int messageResId) {
+            binding.progress.setVisibility(View.GONE);
+            binding.appList.animate().cancel();
+            binding.appList.setVisibility(View.GONE);
+
+            binding.emptyView.setText(messageResId);
+            binding.emptyState.setVisibility(View.VISIBLE);
+        }
+
+        private void showApps() {
+            binding.progress.setVisibility(View.GONE);
+            binding.emptyState.setVisibility(View.GONE);
+
+            binding.appList.animate().cancel();
+            binding.appList.setAlpha(0f);
+            binding.appList.setVisibility(View.VISIBLE);
+            binding.appList.animate()
+                    .alpha(1f)
+                    .setDuration(LIST_FADE_DURATION_MS)
+                    .start();
+        }
+
+        private void release() {
+            released = true;
+            executor.shutdownNow();
+            mainHandler.removeCallbacksAndMessages(null);
+
+            if (windowObserver != null) {
+                if (windowObserver.isAlive()) {
+                    windowObserver.removeOnWindowFocusChangeListener(focusChangeListener);
+                }
+
+                windowObserver = null;
+            }
+
+            binding.retryButton.setOnClickListener(null);
+            binding.appList.setAdapter(null);
+        }
     }
 
     private static List<AppEntry> loadLaunchableApps(Context context) {
