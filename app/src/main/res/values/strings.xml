@@ -43,7 +43,8 @@
     <string name="onboarding_background_action">ALLOW BACKGROUND RUNNING</string>
     <string name="onboarding_background_rationale">Android may put AltShift to sleep during long idle periods, which disables hotkeys after the tablet has been unused overnight.\n\nThe next screen asks you to confirm that AltShift can always run in the background.</string>
     <string name="onboarding_background_continue">CONTINUE</string>
-    <string name="onboarding_background_cancel">CANCEL</string>
+    <string name="onboarding_background_cancel">Cancel</string>
+    <string name="onboarding_background_failed">Unable to open battery optimization settings.</string>
 
     <string name="status_badge_format">%1$s · %2$s</string>
     <string name="status_keyboard_connected">Keyboard connected</string>
@@ -109,7 +110,7 @@
 
     <string name="capture_key_title">Capture key combination</string>
     <string name="capture_key_instruction">Press the physical key combination you want to use.</string>
-    <string name="capture_key_hint">Hold the modifier keys together, then select Save.</string>
+    <string name="capture_key_hint">Hold Ctrl, Alt, or Meta together with the trigger key, then select Save.</string>
     <string name="capture_key_none">No keys captured</string>
     <string name="save">Save</string>
 

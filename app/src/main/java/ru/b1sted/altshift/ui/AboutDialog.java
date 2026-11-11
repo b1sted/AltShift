@@ -61,7 +61,12 @@ public final class AboutDialog {
     private static void loadDiagnosticsAsync(
             Context context, AlertDialog dialog, DialogAboutBinding binding) {
         Handler mainHandler = new Handler(Looper.getMainLooper());
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "altshift-diagnostics");
+            thread.setDaemon(true);
+
+            return thread;
+        });
 
         executor.execute(() -> {
             try {

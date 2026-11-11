@@ -20,27 +20,47 @@ public final class BatteryHelper {
     }
 
     public static boolean isIgnoringBatteryOptimizations(Context context) {
-        PowerManager powerManager = context.getSystemService(PowerManager.class);
-        if (powerManager == null) {
+        if (context == null) {
             return false;
         }
 
-        return powerManager.isIgnoringBatteryOptimizations(context.getPackageName());
+        PowerManager powerManager = context.getSystemService(PowerManager.class);
+        if (powerManager == null) {
+            Log.w(TAG, "PowerManager is unavailable");
+
+            return false;
+        }
+
+        try {
+            return powerManager.isIgnoringBatteryOptimizations(context.getPackageName());
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to read the battery optimization state", exception);
+
+            return false;
+        }
     }
 
     @SuppressLint("BatteryLife")
-    public static void requestIgnoreBatteryOptimizations(Context context) {
+    public static boolean requestIgnoreBatteryOptimizations(Context context) {
+        if (context == null) {
+            return false;
+        }
+
         Intent packageIntent = new Intent(
                 Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                 Uri.parse("package:" + context.getPackageName()));
         if (tryStartActivity(context, packageIntent)) {
-            return;
+            return true;
         }
 
         Intent settingsIntent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-        if (!tryStartActivity(context, settingsIntent)) {
-            Log.w(TAG, "No activity can handle battery optimization settings");
+        if (tryStartActivity(context, settingsIntent)) {
+            return true;
         }
+
+        Log.w(TAG, "No activity can handle battery optimization settings");
+
+        return false;
     }
 
     private static boolean tryStartActivity(Context context, Intent intent) {

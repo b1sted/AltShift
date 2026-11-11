@@ -33,12 +33,12 @@ public final class NotificationChannels {
             return;
         }
 
-        NotificationManager manager = context.getSystemService(NotificationManager.class);
-        if (manager == null) {
-            return;
-        }
-
         try {
+            NotificationManager manager = context.getSystemService(NotificationManager.class);
+            if (manager == null) {
+                return;
+            }
+
             deleteLegacy(manager);
             ensureKeyboardAlerts(context, manager);
             ensureSafetyWarnings(context, manager);

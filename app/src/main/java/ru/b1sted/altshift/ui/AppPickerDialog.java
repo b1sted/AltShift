@@ -81,7 +81,12 @@ public final class AppPickerDialog {
             DialogAppPickerBinding binding,
             AppListAdapter adapter) {
         Handler mainHandler = new Handler(Looper.getMainLooper());
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "altshift-app-picker");
+            thread.setDaemon(true);
+
+            return thread;
+        });
 
         executor.execute(() -> {
             try {

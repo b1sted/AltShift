@@ -43,13 +43,15 @@ public final class HotkeyRepository {
     private HotkeyRepository(Context context) {
         preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
-        bindings = readBindings(preferences.getString(KEY_HOTKEYS, null));
+        bindings = readBindings(readString(preferences, KEY_HOTKEYS));
         languageShortcut = readLanguageShortcut(
-                preferences.getString(KEY_LANGUAGE_SHORTCUT, null));
-        onboardingCompleted = preferences.getBoolean(KEY_ONBOARDING_COMPLETED, false);
-        autoSwitchEnabled = preferences.getBoolean(KEY_AUTO_SWITCH_ENABLED, true);
-        previousInputMethod = preferences.getString(KEY_PREVIOUS_INPUT_METHOD, null);
-        themeMode = ThemeMode.fromKey(preferences.getString(KEY_THEME_MODE, null));
+                readString(preferences, KEY_LANGUAGE_SHORTCUT));
+        onboardingCompleted = readBoolean(
+                preferences, KEY_ONBOARDING_COMPLETED, false);
+        autoSwitchEnabled = readBoolean(
+                preferences, KEY_AUTO_SWITCH_ENABLED, true);
+        previousInputMethod = readString(preferences, KEY_PREVIOUS_INPUT_METHOD);
+        themeMode = ThemeMode.fromKey(readString(preferences, KEY_THEME_MODE));
     }
 
     public static HotkeyRepository getInstance(Context context) {
@@ -200,6 +202,27 @@ public final class HotkeyRepository {
         preferences.edit()
                 .putString(KEY_HOTKEYS, writeBindings(updated))
                 .apply();
+    }
+
+    private static String readString(SharedPreferences preferences, String key) {
+        try {
+            return preferences.getString(key, null);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Ignoring an invalid preference value for " + key, exception);
+
+            return null;
+        }
+    }
+
+    private static boolean readBoolean(
+            SharedPreferences preferences, String key, boolean fallback) {
+        try {
+            return preferences.getBoolean(key, fallback);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Ignoring an invalid preference value for " + key, exception);
+
+            return fallback;
+        }
     }
 
     private static HotkeyBinding[] upsertBinding(

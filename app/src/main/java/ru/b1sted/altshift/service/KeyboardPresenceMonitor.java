@@ -67,6 +67,10 @@ public final class KeyboardPresenceMonitor {
             }
 
             int[] deviceIds = manager.getInputDeviceIds();
+            if (deviceIds == null) {
+                return null;
+            }
+
             for (int index = 0; index < deviceIds.length; index++) {
                 InputDevice device = manager.getInputDevice(deviceIds[index]);
                 if (isUsableKeyboard(device)) {

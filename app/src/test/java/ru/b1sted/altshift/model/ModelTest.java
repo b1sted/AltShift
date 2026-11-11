@@ -60,4 +60,9 @@ public final class ModelTest {
     public void hotkeyRejectsUnknownKeyCode() {
         new HotkeyBinding(0, false, false, false, false, "com.example", "Example");
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void languageShortcutRejectsUnknownKeyCode() {
+        new LanguageSwitchShortcut(0, false, false, false, false);
+    }
 }

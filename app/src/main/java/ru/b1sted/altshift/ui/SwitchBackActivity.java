@@ -20,6 +20,7 @@ import androidx.annotation.Nullable;
 
 import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardNotification;
+import ru.b1sted.altshift.service.KeyboardPromptOverlay;
 
 /**
  * Transparent trampoline that opens the native input method picker and grades
@@ -39,6 +40,7 @@ public final class SwitchBackActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private InputClientView inputClient;
+    private boolean pickerScheduled;
     private boolean pickerRequested;
     private boolean pickerLostFocus;
     private boolean pickerDismissed;
@@ -64,6 +66,7 @@ public final class SwitchBackActivity extends Activity {
         super.onCreate(savedInstanceState);
         overridePendingTransition(0, 0);
 
+        KeyboardPromptOverlay.dismissActive();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
         setContentView(createInputClient());
         handler.postDelayed(this::finishSilently, SAFETY_FINISH_MS);
@@ -81,13 +84,15 @@ public final class SwitchBackActivity extends Activity {
             return;
         }
 
-        if (!pickerRequested) {
+        if (!pickerScheduled) {
             requestPicker();
 
             return;
         }
 
-        if (pickerLostFocus) {
+        // Ignore focus churn during the launch delay: only a picker that was
+        // actually requested can be graded when focus comes back.
+        if (pickerRequested && pickerLostFocus) {
             onPickerDismissed();
             finishSilently();
         }
@@ -119,12 +124,16 @@ public final class SwitchBackActivity extends Activity {
     }
 
     private void requestPicker() {
-        pickerRequested = true;
+        if (pickerScheduled) {
+            return;
+        }
+
+        pickerScheduled = true;
         handler.postDelayed(this::showPicker, PICKER_LAUNCH_DELAY_MS);
     }
 
     private void showPicker() {
-        if (isFinishing() || pickerDismissed) {
+        if (isFinishing() || isDestroyed() || pickerDismissed) {
             return;
         }
 
@@ -138,6 +147,7 @@ public final class SwitchBackActivity extends Activity {
         }
 
         focusInputClient();
+        pickerRequested = true;
 
         try {
             manager.showInputMethodPicker();
@@ -181,7 +191,7 @@ public final class SwitchBackActivity extends Activity {
      * notification because the user did not finish a deliberate interaction.
      */
     private void finishSilently() {
-        if (isFinishing()) {
+        if (isFinishing() || isDestroyed()) {
             return;
         }
 

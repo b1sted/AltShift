@@ -1,8 +1,8 @@
 package ru.b1sted.altshift.ui;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.database.ContentObserver;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -22,11 +22,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ActivityOnboardingBinding;
@@ -34,6 +36,7 @@ import ru.b1sted.altshift.service.HardwareInputService;
 import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.util.BatteryHelper;
+import ru.b1sted.altshift.util.PermissionHelper;
 
 public final class OnboardingActivity extends AppCompatActivity {
 
@@ -45,6 +48,8 @@ public final class OnboardingActivity extends AppCompatActivity {
     private static final int STEP_ENABLE = 0;
     private static final int STEP_SELECT = 1;
     private static final int STEP_PERMISSIONS = 2;
+    private static final String STATE_CURRENT_STEP = "current_step";
+    private static final String STATE_NOTIFICATION_REQUESTED = "notification_requested";
 
     private final ContentObserver inputMethodObserver = new ContentObserver(
             new Handler(Looper.getMainLooper())) {
@@ -58,10 +63,19 @@ public final class OnboardingActivity extends AppCompatActivity {
         }
     };
 
+    private final ExecutorService stateExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "altshift-onboarding");
+        thread.setDaemon(true);
+
+        return thread;
+    });
+
     private ActivityOnboardingBinding binding;
     private HotkeyRepository repository;
     private int currentStep = STEP_ENABLE;
+    private int stateGeneration;
     private boolean notificationRequested;
+    private boolean resumed;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -96,12 +110,28 @@ public final class OnboardingActivity extends AppCompatActivity {
             }
         });
 
-        showStep(rerun ? STEP_ENABLE : firstIncompleteStep());
+        int initialStep = savedInstanceState == null
+                ? (rerun ? STEP_ENABLE : firstIncompleteStep())
+                : savedInstanceState.getInt(STATE_CURRENT_STEP, STEP_ENABLE);
+        notificationRequested = savedInstanceState != null
+                && savedInstanceState.getBoolean(STATE_NOTIFICATION_REQUESTED, false);
+
+        showStep(initialStep);
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+
+        outState.putInt(STATE_CURRENT_STEP, currentStep);
+        outState.putBoolean(STATE_NOTIFICATION_REQUESTED, notificationRequested);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+
+        resumed = true;
 
         if (binding == null) {
             return;
@@ -111,22 +141,49 @@ public final class OnboardingActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        resumed = false;
+
+        super.onPause();
+    }
+
+    @Override
     protected void onStart() {
         super.onStart();
 
         HardwareInputService.setAutoSwitchSuppressed(true);
-        getContentResolver().registerContentObserver(
-                Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
-                false,
-                inputMethodObserver);
+        registerInputMethodObserver();
     }
 
     @Override
     protected void onStop() {
-        getContentResolver().unregisterContentObserver(inputMethodObserver);
+        unregisterInputMethodObserver();
         HardwareInputService.setAutoSwitchSuppressed(false);
 
         super.onStop();
+    }
+
+    private void registerInputMethodObserver() {
+        try {
+            getContentResolver().registerContentObserver(
+                    Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
+                    false,
+                    inputMethodObserver);
+            getContentResolver().registerContentObserver(
+                    Settings.Secure.getUriFor(Settings.Secure.ENABLED_INPUT_METHODS),
+                    false,
+                    inputMethodObserver);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to observe input method settings", exception);
+        }
+    }
+
+    private void unregisterInputMethodObserver() {
+        try {
+            getContentResolver().unregisterContentObserver(inputMethodObserver);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to stop observing input method settings", exception);
+        }
     }
 
     @Override
@@ -138,6 +195,15 @@ public final class OnboardingActivity extends AppCompatActivity {
         }
 
         refreshState();
+    }
+
+    @Override
+    protected void onDestroy() {
+        stateGeneration++;
+        stateExecutor.shutdownNow();
+        binding = null;
+
+        super.onDestroy();
     }
 
     @Override
@@ -197,21 +263,60 @@ public final class OnboardingActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * IME lookups are Binder calls, so the repeated wizard refreshes resolve
+     * them on a background thread. The generation token drops results that
+     * arrive after a step change or teardown.
+     */
     private void refreshState() {
-        boolean imeEnabled = isImeEnabled();
-        boolean imeActive = isAltShiftActive();
-        boolean overlayGranted = Settings.canDrawOverlays(this);
-        boolean notificationsGranted = hasNotificationPermission();
+        if (binding == null) {
+            return;
+        }
+
+        int generation = ++stateGeneration;
+        Context appContext = getApplicationContext();
+
+        try {
+            stateExecutor.execute(() -> {
+                try {
+                    boolean imeEnabled = InputMethodSwitcher.isAltShiftEnabled(appContext);
+                    boolean imeActive = InputMethodSwitcher.isAltShiftActive(appContext);
+                    boolean alternativeAvailable =
+                            InputMethodSwitcher.hasAlternativeInputMethod(appContext);
+
+                    runOnUiThread(() -> applyState(
+                            generation, imeEnabled, imeActive, alternativeAvailable));
+                } catch (RuntimeException exception) {
+                    Log.e(TAG, "Unable to refresh the onboarding state", exception);
+                }
+            });
+        } catch (RejectedExecutionException exception) {
+            Log.w(TAG, "Onboarding state refresh rejected during teardown", exception);
+        }
+    }
+
+    private void applyState(
+            int generation,
+            boolean imeEnabled,
+            boolean imeActive,
+            boolean alternativeAvailable) {
+        if (generation != stateGeneration || binding == null
+                || isFinishing() || isDestroyed()) {
+            return;
+        }
+
+        boolean overlayGranted = PermissionHelper.canDrawOverlays(this);
+        boolean notificationsGranted = PermissionHelper.hasNotificationPermission(this);
 
         switch (currentStep) {
-            case STEP_ENABLE -> refreshEnableStep(imeEnabled);
-            case STEP_SELECT -> refreshSelectStep(imeEnabled, imeActive);
+            case STEP_ENABLE -> refreshEnableStep(imeEnabled, alternativeAvailable);
+            case STEP_SELECT -> refreshSelectStep(
+                    imeEnabled, imeActive, alternativeAvailable);
             default -> refreshPermissionsStep(overlayGranted, notificationsGranted);
         }
     }
 
-    private void refreshEnableStep(boolean imeEnabled) {
-        boolean alternativeAvailable = hasAlternativeKeyboard();
+    private void refreshEnableStep(boolean imeEnabled, boolean alternativeAvailable) {
         binding.stepStatus.setVisibility(View.VISIBLE);
         binding.permissionsCard.setVisibility(View.GONE);
 
@@ -234,7 +339,8 @@ public final class OnboardingActivity extends AppCompatActivity {
         binding.secondaryButton.setVisibility(View.GONE);
     }
 
-    private void refreshSelectStep(boolean imeEnabled, boolean imeActive) {
+    private void refreshSelectStep(
+            boolean imeEnabled, boolean imeActive, boolean alternativeAvailable) {
         binding.secondaryButton.setVisibility(View.GONE);
         binding.stepStatus.setVisibility(View.VISIBLE);
         binding.permissionsCard.setVisibility(View.GONE);
@@ -247,7 +353,7 @@ public final class OnboardingActivity extends AppCompatActivity {
             return;
         }
 
-        if (!hasAlternativeKeyboard()) {
+        if (!alternativeAvailable) {
             binding.primaryButton.setText(
                     R.string.onboarding_enable_soft_keyboard_action);
             binding.stepStatus.setText(
@@ -305,7 +411,7 @@ public final class OnboardingActivity extends AppCompatActivity {
 
         refreshBatterySection();
 
-        if (notificationsRequired && !notificationRequested) {
+        if (notificationsRequired && !notificationRequested && resumed) {
             notificationRequested = true;
             requestNotificationPermission();
         }
@@ -348,15 +454,23 @@ public final class OnboardingActivity extends AppCompatActivity {
                 .setTitle(R.string.onboarding_background_title)
                 .setMessage(R.string.onboarding_background_rationale)
                 .setPositiveButton(R.string.onboarding_background_continue,
-                        (dialog, which) -> BatteryHelper.requestIgnoreBatteryOptimizations(this))
+                        (dialog, which) -> openBatteryOptimizationSettings())
                 .setNegativeButton(R.string.onboarding_background_cancel, null)
                 .show();
     }
 
+    private void openBatteryOptimizationSettings() {
+        if (BatteryHelper.requestIgnoreBatteryOptimizations(this)) {
+            return;
+        }
+
+        toast(R.string.onboarding_background_failed);
+    }
+
     private void handleSecondaryAction() {
         if (currentStep == STEP_PERMISSIONS
-                && Settings.canDrawOverlays(this)
-                && !hasNotificationPermission()) {
+                && PermissionHelper.canDrawOverlays(this)
+                && !PermissionHelper.hasNotificationPermission(this)) {
             completeOnboarding();
 
             return;
@@ -392,13 +506,13 @@ public final class OnboardingActivity extends AppCompatActivity {
                 showImePicker();
             }
             default -> {
-                if (!Settings.canDrawOverlays(this)) {
+                if (!PermissionHelper.canDrawOverlays(this)) {
                     openOverlaySettings();
 
                     return;
                 }
 
-                if (!hasNotificationPermission()) {
+                if (!PermissionHelper.hasNotificationPermission(this)) {
                     requestNotificationPermission();
 
                     return;
@@ -433,22 +547,12 @@ public final class OnboardingActivity extends AppCompatActivity {
         return InputMethodSwitcher.hasAlternativeInputMethod(this);
     }
 
-    private boolean hasNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            return true;
-        }
-
-        return ContextCompat.checkSelfPermission(
-                this, Manifest.permission.POST_NOTIFICATIONS)
-                == PackageManager.PERMISSION_GRANTED;
-    }
-
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             return;
         }
 
-        if (hasNotificationPermission()) {
+        if (PermissionHelper.hasNotificationPermission(this)) {
             return;
         }
 
