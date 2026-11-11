@@ -80,7 +80,7 @@ public final class OnboardingActivity extends AppCompatActivity {
             }
         });
 
-        showStep(firstIncompleteStep());
+        showStep(rerun ? STEP_ENABLE : firstIncompleteStep());
     }
 
     @Override
