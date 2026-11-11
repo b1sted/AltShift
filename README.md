@@ -12,6 +12,9 @@
     <a href="https://github.com/b1sted/AltShift/releases">
         <img src="https://img.shields.io/github/v/release/b1sted/AltShift?style=flat-square&color=blue&label=Release" alt="Release" />
     </a>
+    <a href="https://github.com/b1sted/AltShift/releases/tag/v0.4.1">
+        <img src="https://img.shields.io/badge/Version-0.4.1-blue?style=flat-square" alt="Version" />
+    </a>
     <a href="#license">
         <img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License" />
     </a>
@@ -161,7 +164,7 @@ Open **AltShift** from the launcher.
 | Theme | System default | Light, Dark, or System theme, applied application-wide and persisted. |
 | Seamless auto-switching | On | Switches between AltShift and the soft keyboard when a hardware keyboard attaches or detaches. Requires `WRITE_SECURE_SETTINGS`. |
 
-The fullscreen onboarding wizard reports whether AltShift is enabled and selected, requests notification permission on Android 13+, and provides a one-tap overlay permission action. The dashboard shows a toolbar status badge, the language shortcut card, the auto-switch toggle, and the app hotkey list. App shortcuts are stored per package and can be removed from the list.
+The fullscreen onboarding wizard reports whether AltShift is enabled and selected, requests notification permission on Android 13+, provides a one-tap overlay permission action, and requests a battery optimization exemption so the service survives Doze mode. The dashboard shows a toolbar status badge, the language shortcut card, the auto-switch toggle, and the app hotkey list. App shortcuts are stored per package and can be removed from the list.
 
 Configuration data lives in the app's private `SharedPreferences` file (`altshift_prefs`). Uninstalling the application removes it.
 

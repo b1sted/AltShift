@@ -25,6 +25,7 @@ import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ActivityOnboardingBinding;
 import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.storage.HotkeyRepository;
+import ru.b1sted.altshift.util.BatteryHelper;
 
 public final class OnboardingActivity extends AppCompatActivity {
 
@@ -60,6 +61,8 @@ public final class OnboardingActivity extends AppCompatActivity {
 
         binding.primaryButton.setOnClickListener(view -> handlePrimaryAction());
         binding.secondaryButton.setOnClickListener(view -> handleSecondaryAction());
+        binding.batteryButton.setOnClickListener(view ->
+                BatteryHelper.requestIgnoreBatteryOptimizations(this));
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -160,6 +163,7 @@ public final class OnboardingActivity extends AppCompatActivity {
 
     private void refreshEnableStep(boolean imeEnabled) {
         boolean alternativeAvailable = hasAlternativeKeyboard();
+        setBatterySectionVisible(false);
 
         if (!imeEnabled) {
             binding.primaryButton.setText(R.string.onboarding_step_enable_action);
@@ -182,6 +186,7 @@ public final class OnboardingActivity extends AppCompatActivity {
 
     private void refreshSelectStep(boolean imeEnabled, boolean imeActive) {
         binding.secondaryButton.setVisibility(View.GONE);
+        setBatterySectionVisible(false);
 
         if (!imeEnabled) {
             binding.primaryButton.setText(R.string.onboarding_step_enable_action);
@@ -245,10 +250,37 @@ public final class OnboardingActivity extends AppCompatActivity {
                 ? R.string.onboarding_finish_anyway
                 : R.string.onboarding_notifications_action);
 
+        refreshBatterySection();
+
         if (notificationsRequired && !notificationRequested) {
             notificationRequested = true;
             requestNotificationPermission();
         }
+    }
+
+    private void refreshBatterySection() {
+        boolean unrestricted = BatteryHelper.isIgnoringBatteryOptimizations(this);
+
+        binding.batteryTitle.setVisibility(View.VISIBLE);
+        binding.batteryStatus.setVisibility(View.VISIBLE);
+        binding.batteryStatus.setText(unrestricted
+                ? R.string.onboarding_background_granted
+                : R.string.onboarding_background_restricted);
+        binding.batteryStatus.setTextColor(getColor(unrestricted
+                ? R.color.brand_success
+                : R.color.brand_on_surface_variant));
+
+        binding.batteryDescription.setVisibility(unrestricted ? View.GONE : View.VISIBLE);
+        binding.batteryButton.setVisibility(unrestricted ? View.GONE : View.VISIBLE);
+    }
+
+    private void setBatterySectionVisible(boolean visible) {
+        int visibility = visible ? View.VISIBLE : View.GONE;
+
+        binding.batteryTitle.setVisibility(visibility);
+        binding.batteryStatus.setVisibility(visibility);
+        binding.batteryDescription.setVisibility(visibility);
+        binding.batteryButton.setVisibility(visibility);
     }
 
     private void handleSecondaryAction() {

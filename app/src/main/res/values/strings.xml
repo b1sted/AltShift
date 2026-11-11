@@ -25,7 +25,7 @@
     <string name="onboarding_step_select_status_no_soft_keyboard">Enable a soft keyboard first so you can still type without the hardware keyboard.</string>
 
     <string name="onboarding_step_permissions_title">Grant permissions</string>
-    <string name="onboarding_step_permissions_description">Allow notifications and overlay access so AltShift can switch keyboards and launch apps from background hotkeys without system prompts on devices with strict background restrictions.</string>
+    <string name="onboarding_step_permissions_description">Allow notifications, overlay access, and background execution so AltShift can switch keyboards and launch apps from hotkeys even after long periods of inactivity.</string>
     <string name="onboarding_step_permissions_action">GRANT OVERLAY PERMISSION</string>
     <string name="onboarding_overlay_granted">Overlay access: granted</string>
     <string name="onboarding_overlay_pending">Overlay access: not granted</string>
@@ -34,6 +34,12 @@
     <string name="onboarding_notifications_pending">Notifications: disabled</string>
     <string name="onboarding_notifications_action">ALLOW NOTIFICATIONS</string>
     <string name="onboarding_finish_anyway">FINISH ANYWAY</string>
+
+    <string name="onboarding_background_title">Background Execution</string>
+    <string name="onboarding_background_description">Prevent Android from putting AltShift to sleep so it remains active after long periods of inactivity.</string>
+    <string name="onboarding_background_granted">✓ Background running: unrestricted</string>
+    <string name="onboarding_background_restricted">Background running: optimized/restricted</string>
+    <string name="onboarding_background_action">ALLOW BACKGROUND RUNNING</string>
 
     <string name="status_badge_format">%1$s · %2$s</string>
     <string name="status_keyboard_connected">Keyboard connected</string>
