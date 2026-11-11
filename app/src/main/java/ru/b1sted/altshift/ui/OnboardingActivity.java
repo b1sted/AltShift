@@ -3,6 +3,7 @@ package ru.b1sted.altshift.ui;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -10,6 +11,7 @@ import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -18,6 +20,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.Objects;
 
@@ -61,8 +65,7 @@ public final class OnboardingActivity extends AppCompatActivity {
 
         binding.primaryButton.setOnClickListener(view -> handlePrimaryAction());
         binding.secondaryButton.setOnClickListener(view -> handleSecondaryAction());
-        binding.batteryButton.setOnClickListener(view ->
-                BatteryHelper.requestIgnoreBatteryOptimizations(this));
+        binding.batteryButton.setOnClickListener(view -> showBatteryRationale());
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -163,7 +166,8 @@ public final class OnboardingActivity extends AppCompatActivity {
 
     private void refreshEnableStep(boolean imeEnabled) {
         boolean alternativeAvailable = hasAlternativeKeyboard();
-        setBatterySectionVisible(false);
+        binding.stepStatus.setVisibility(View.VISIBLE);
+        binding.permissionsCard.setVisibility(View.GONE);
 
         if (!imeEnabled) {
             binding.primaryButton.setText(R.string.onboarding_step_enable_action);
@@ -186,7 +190,8 @@ public final class OnboardingActivity extends AppCompatActivity {
 
     private void refreshSelectStep(boolean imeEnabled, boolean imeActive) {
         binding.secondaryButton.setVisibility(View.GONE);
-        setBatterySectionVisible(false);
+        binding.stepStatus.setVisibility(View.VISIBLE);
+        binding.permissionsCard.setVisibility(View.GONE);
 
         if (!imeEnabled) {
             binding.primaryButton.setText(R.string.onboarding_step_enable_action);
@@ -223,6 +228,21 @@ public final class OnboardingActivity extends AppCompatActivity {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                         && !notificationsGranted;
 
+        binding.stepStatus.setVisibility(View.GONE);
+        binding.permissionsCard.setVisibility(View.VISIBLE);
+
+        bindPermissionStatus(binding.overlayDot, binding.overlayStatus, overlayGranted,
+                R.string.onboarding_overlay_granted,
+                R.string.onboarding_overlay_pending,
+                R.color.brand_success,
+                R.color.brand_error);
+        bindPermissionStatus(binding.notificationsDot, binding.notificationsStatus,
+                notificationsGranted,
+                R.string.onboarding_notifications_granted,
+                R.string.onboarding_notifications_pending,
+                R.color.brand_success,
+                R.color.brand_error);
+
         if (!overlayGranted) {
             binding.primaryButton.setText(R.string.onboarding_step_permissions_action);
         } else if (notificationsRequired) {
@@ -230,19 +250,6 @@ public final class OnboardingActivity extends AppCompatActivity {
         } else {
             binding.primaryButton.setText(R.string.onboarding_step_finish);
         }
-
-        String overlayStatus = getString(overlayGranted
-                ? R.string.onboarding_overlay_granted
-                : R.string.onboarding_overlay_pending);
-        String notificationStatus = getString(notificationsGranted
-                ? R.string.onboarding_notifications_granted
-                : R.string.onboarding_notifications_pending);
-        binding.stepStatus.setText(getString(
-                R.string.onboarding_status_two_lines, overlayStatus, notificationStatus));
-        binding.stepStatus.setTextColor(getColor(
-                overlayGranted && notificationsGranted
-                        ? R.color.brand_success
-                        : R.color.brand_error));
 
         boolean showSecondary = notificationsRequired;
         binding.secondaryButton.setVisibility(showSecondary ? View.VISIBLE : View.GONE);
@@ -261,26 +268,43 @@ public final class OnboardingActivity extends AppCompatActivity {
     private void refreshBatterySection() {
         boolean unrestricted = BatteryHelper.isIgnoringBatteryOptimizations(this);
 
-        binding.batteryTitle.setVisibility(View.VISIBLE);
-        binding.batteryStatus.setVisibility(View.VISIBLE);
-        binding.batteryStatus.setText(unrestricted
-                ? R.string.onboarding_background_granted
-                : R.string.onboarding_background_restricted);
-        binding.batteryStatus.setTextColor(getColor(unrestricted
-                ? R.color.brand_success
-                : R.color.brand_on_surface_variant));
-
+        bindPermissionStatus(binding.batteryDot, binding.batteryStatus, unrestricted,
+                R.string.onboarding_background_granted,
+                R.string.onboarding_background_restricted,
+                R.color.brand_success,
+                R.color.brand_on_surface_variant);
         binding.batteryDescription.setVisibility(unrestricted ? View.GONE : View.VISIBLE);
         binding.batteryButton.setVisibility(unrestricted ? View.GONE : View.VISIBLE);
     }
 
-    private void setBatterySectionVisible(boolean visible) {
-        int visibility = visible ? View.VISIBLE : View.GONE;
+    private void bindPermissionStatus(
+            View dot, TextView status, boolean granted,
+            int grantedResId, int pendingResId,
+            int grantedColorResId, int pendingColorResId) {
+        int colorResId = granted ? grantedColorResId : pendingColorResId;
 
-        binding.batteryTitle.setVisibility(visibility);
-        binding.batteryStatus.setVisibility(visibility);
-        binding.batteryDescription.setVisibility(visibility);
-        binding.batteryButton.setVisibility(visibility);
+        tintStatusDot(dot, colorResId);
+        status.setText(granted ? grantedResId : pendingResId);
+        status.setTextColor(getColor(colorResId));
+    }
+
+    private void tintStatusDot(View dot, int colorResId) {
+        Drawable background = dot.getBackground();
+        if (background == null) {
+            return;
+        }
+
+        background.mutate().setTint(getColor(colorResId));
+    }
+
+    private void showBatteryRationale() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.onboarding_background_title)
+                .setMessage(R.string.onboarding_background_rationale)
+                .setPositiveButton(R.string.onboarding_background_continue,
+                        (dialog, which) -> BatteryHelper.requestIgnoreBatteryOptimizations(this))
+                .setNegativeButton(R.string.onboarding_background_cancel, null)
+                .show();
     }
 
     private void handleSecondaryAction() {
