@@ -33,6 +33,8 @@ public final class HardwareInputService extends InputMethodService {
     private static final String TAG = "AltShift";
     private static final String INPUT_THREAD_NAME = "AltShift-Input";
 
+    private static volatile boolean autoSwitchSuppressed;
+
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable refreshInputViewTask = this::refreshInputView;
 
@@ -158,6 +160,14 @@ public final class HardwareInputService extends InputMethodService {
      */
     public static void startKeyboardMonitor(Context context) {
         KeyboardMonitor.ensureStarted(context);
+    }
+
+    /**
+     * Prevents the monitor from undoing an explicit IME selection made in the
+     * setup wizard while the wizard is in the foreground.
+     */
+    public static void setAutoSwitchSuppressed(boolean suppressed) {
+        autoSwitchSuppressed = suppressed;
     }
 
     /**
@@ -612,6 +622,10 @@ public final class HardwareInputService extends InputMethodService {
 
         private void applyKeyboardDetached(boolean alternative) {
             KeyboardPromptOverlay.dismissActive();
+
+            if (autoSwitchSuppressed) {
+                return;
+            }
 
             if (!alternative || !isAutoSwitchPreferenceEnabled()) {
                 return;

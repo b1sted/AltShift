@@ -30,6 +30,7 @@ import java.util.Objects;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ActivityOnboardingBinding;
+import ru.b1sted.altshift.service.HardwareInputService;
 import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.util.BatteryHelper;
@@ -113,6 +114,7 @@ public final class OnboardingActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
 
+        HardwareInputService.setAutoSwitchSuppressed(true);
         getContentResolver().registerContentObserver(
                 Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
                 false,
@@ -122,6 +124,7 @@ public final class OnboardingActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         getContentResolver().unregisterContentObserver(inputMethodObserver);
+        HardwareInputService.setAutoSwitchSuppressed(false);
 
         super.onStop();
     }
