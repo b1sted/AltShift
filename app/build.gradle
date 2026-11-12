@@ -12,8 +12,8 @@ android {
         applicationId 'ru.b1sted.altshift'
         minSdk 26
         targetSdk 34
-        versionCode 8
-        versionName '0.4.1'
+        versionCode 9
+        versionName '0.4.2'
     }
 
     buildFeatures {
@@ -54,6 +54,13 @@ android {
     lint {
         // Pinned to the newest releases compatible with compileSdk 34.
         disable += 'GradleDependency'
+    }
+
+    // Keep the proprietary Play PKDS metadata block out of the APK signature
+    // so independent security scanners see a clean artifact.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     applicationVariants.all { variant ->

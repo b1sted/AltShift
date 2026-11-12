@@ -12,9 +12,6 @@
     <a href="https://github.com/b1sted/AltShift/releases">
         <img src="https://img.shields.io/github/v/release/b1sted/AltShift?style=flat-square&color=blue&label=Release" alt="Release" />
     </a>
-    <a href="https://github.com/b1sted/AltShift/releases/tag/v0.4.1">
-        <img src="https://img.shields.io/badge/Version-0.4.1-blue?style=flat-square" alt="Version" />
-    </a>
     <a href="#license">
         <img src="https://img.shields.io/badge/License-GPLv3-blue?style=flat-square" alt="License" />
     </a>
