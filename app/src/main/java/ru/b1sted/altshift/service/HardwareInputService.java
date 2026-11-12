@@ -612,6 +612,14 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         private void applyKeyboardAttached() {
+            // A stylus handwriting session holds the input connection, so it must
+            // be released before AltShift can take over the physical keyboard.
+            HardwareInputService service = serviceRef.get();
+            if (service != null) {
+                mainHandler.post(
+                        () -> InputMethodSwitcher.resetStylusHandwritingSession(service));
+            }
+
             if (isAutoSwitchPreferenceEnabled()
                     && InputMethodSwitcher.switchToAltShift(appContext)) {
                 KeyboardPromptOverlay.dismissActive();

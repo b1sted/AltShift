@@ -66,6 +66,8 @@ public final class SwitchBackActivity extends Activity {
         super.onCreate(savedInstanceState);
         overridePendingTransition(0, 0);
 
+        // Gboard's stylus handwriting session can suppress the system picker.
+        InputMethodSwitcher.resetStylusHandwritingSession(this);
         KeyboardPromptOverlay.dismissActive();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
         setContentView(createInputClient());

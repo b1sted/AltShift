@@ -1,13 +1,20 @@
 package ru.b1sted.altshift.service;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.inputmethodservice.InputMethodService;
+import android.os.Build;
+import android.os.IBinder;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.View;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
+
+import androidx.annotation.RequiresApi;
 
 import java.util.List;
 
@@ -27,6 +34,64 @@ public final class InputMethodSwitcher {
     private static final Object SWITCH_LOCK = new Object();
 
     private InputMethodSwitcher() {
+    }
+
+    /**
+     * Releases the Android 14+ stylus handwriting session so it cannot block or
+     * delay an input method switch. An IME finishes its own session directly;
+     * a client dismisses the active IME window, which tears the session down.
+     */
+    public static void resetStylusHandwritingSession(Context context) {
+        if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return;
+        }
+
+        if (context instanceof InputMethodService service) {
+            finishOwnHandwritingSession(service);
+
+            return;
+        }
+
+        if (context instanceof Activity activity) {
+            dismissActiveHandwritingWindow(activity);
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    private static void finishOwnHandwritingSession(InputMethodService service) {
+        try {
+            service.finishStylusHandwriting();
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to finish stylus handwriting session", exception);
+        }
+    }
+
+    private static void dismissActiveHandwritingWindow(Activity activity) {
+        View decorView = activity.getWindow().getDecorView();
+
+        // The window token only exists after the decor view is attached, so the
+        // dismiss request is deferred until the first layout pass.
+        decorView.post(() -> hideInputMethodWindow(activity, decorView));
+    }
+
+    private static void hideInputMethodWindow(Activity activity, View decorView) {
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            return;
+        }
+
+        IBinder windowToken = decorView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+
+        try {
+            InputMethodManager manager = activity.getSystemService(InputMethodManager.class);
+            if (manager != null) {
+                manager.hideSoftInputFromWindow(windowToken, 0);
+            }
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to dismiss the stylus handwriting window", exception);
+        }
     }
 
     /**
