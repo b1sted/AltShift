@@ -56,6 +56,13 @@ android {
         disable += 'GradleDependency'
     }
 
+    // Keep the proprietary Play PKDS metadata block out of the APK signature
+    // so independent security scanners see a clean artifact.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     applicationVariants.all { variant ->
         variant.outputs.all {
             def type = variant.buildType.name == 'release' ? '' : "-${variant.buildType.name}"
