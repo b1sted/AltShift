@@ -20,10 +20,14 @@
     </a>
 </p>
 <p align="center">
+    <strong>English</strong> &bull; <a href="README.ru.md">Русский</a>
+</p>
+<p align="center">
     <a href="#overview">Overview</a> &bull;
     <a href="#features">Features</a> &bull;
     <a href="#standby-reconnect-watchdog">Watchdog</a> &bull;
     <a href="#resource-footprint--verification">Resource Footprint</a> &bull;
+    <a href="#release-verification">Release Verification</a> &bull;
     <a href="#requirements">Requirements</a> &bull;
     <a href="#building-from-cli">Building from CLI</a> &bull;
     <a href="#adb-setup">ADB Setup</a> &bull;
@@ -32,7 +36,13 @@
 </p>
 <hr>
 
-<p align="center"><img src="docs/screenshots/gui.png" alt="AltShift Dashboard" width="760" /></p>
+<p align="center"><img src=".github/assets/gui.png" alt="AltShift Dashboard" width="760" /></p>
+
+<p align="center">
+    <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22ru.b1sted.altshift%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fb1sted%2FAltShift%22%2C%22author%22%3A%22b1sted%22%2C%22name%22%3A%22AltShift%22%2C%22additionalSettings%22%3A%22%7B%5C%22apkFilterRegEx%5C%22%3A%20%5C%22%5EAltShift-v%5B0-9.%5D%2B%5C%5C%5C%5C.apk%24%5C%22%7D%22%7D">
+        <img src=".github/assets/badge_obtainium.png" alt="Get it on Obtainium" height="54" />
+    </a>
+</p>
 
 A minimal, hardware-first input method service for Android that turns a physical keyboard into a first-class input device. No cloud services, no analytics, and no persistent background daemons.
 
@@ -62,7 +72,7 @@ It performs no polling and holds no wake lock: the foreground service simply kee
 
 - **Full Russian PC layout emulation (ЙЦУКЕН)**: Complete letter, punctuation, and number-row mapping (`1..0`, `-`, `=`) with strict CapsLock isolation. CapsLock affects only alphabetic keys and never inverts digits or symbols.
 - **Russian localization & per-app language**: A complete `values-ru` translation covers the dashboard, onboarding, dialogs, Dynamic Island, notifications, and watchdog status. The app follows the system locale automatically (`en` / `ru`), and the in-app selector offers `System default`, `English`, and `Русский`. The choice is applied application-wide, reaches non-Activity components such as the overlay and notifications, and stays in sync with Android 13+ System App Language Settings through `AppCompatDelegate.setApplicationLocales` and `localeConfig`.
-- **Configurable language switch**: The default `Alt + Shift` combination toggles Russian transliteration and is captured from the next physical key combination in the settings UI. The OS subtype switcher is bypassed.
+- **Configurable language switch**: The default `Alt + Shift` combination switches between English and Russian layouts and is captured from the next physical key combination in the settings UI. The OS subtype switcher is bypassed.
 - **Global app shortcuts**: Bind any hardware key combination to an installed application. Shortcuts are dispatched directly through the launcher intent and consume only the combinations the user defines. App hotkeys and the language switch cannot be assigned the same combination.
 - **Responsive Dynamic Island**: A floating Material 3 capsule that resolves the persisted Light, Dark, or System theme before inflating, then uses dedicated `prompt_surface`/`prompt_stroke` tokens with a subtle 1dp hairline and an unclipped 4dp elevation shadow, plus a one-tap action that opens the direct system IME picker. On phones it keeps a clean 16dp screen edge and lets the message wrap to two lines so the action and close buttons stay on-screen without an ellipsis; on tablets and large screens (600dp+) it keeps the 420dp capsule with a single-line message.
 - **Dual-mode keyboard switching**: AltShift returns natively to the on-screen keyboard when the hardware keyboard is detached, and can additionally switch autonomously on attach and detach when `WRITE_SECURE_SETTINGS` is granted.
@@ -118,6 +128,24 @@ adb shell dumpsys package ru.b1sted.altshift | grep "permission.INTERNET"
 # Confirm the watchdog is absent while AltShift is the active IME (no output expected)
 adb shell dumpsys activity services ru.b1sted.altshift | grep KeyboardWatchdog
 ```
+
+## Release Verification
+
+Release APKs (`AltShift-v<version>.apk`) are signed with the author's release key and published via GitHub Actions. Each GitHub release includes the APK's **SHA-256 checksum** and a **VirusTotal scan report** in its release notes.
+
+You can verify the signing certificate fingerprint with `apksigner` (from Android SDK Build-Tools):
+
+```bash
+apksigner verify --print-certs AltShift-v<version>.apk
+```
+
+Expected signing certificate SHA-256 digest:
+
+```text
+41:3A:4A:1F:B4:92:80:A8:66:F8:16:13:1E:0B:E2:BC:45:B4:87:63:2F:B4:65:71:01:17:18:25:04:84:2B:65
+```
+
+> **Note:** Debug and release builds use different signing keys. If you previously installed a `-debug.apk`, uninstall it before switching to a release build or Obtainium.
 
 ## Requirements
 
@@ -217,7 +245,7 @@ Open **AltShift** from the launcher.
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| Language switch | `Alt + Shift` | Toggles Russian transliteration. Captured from the next physical combination. |
+| Language switch | `Alt + Shift` | Switches between English and Russian layouts. Captured from the next physical combination. |
 | App hotkeys | Empty | Each binding maps a modifier mask and key code to an installed application. A combination already used by the language switch is rejected. |
 | Theme | System default | Light, Dark, or System theme, applied application-wide and persisted. |
 | App language | System default | `System default`, `English`, or `Русский`. Applied application-wide to the dashboard, onboarding, dialogs, Dynamic Island, notifications, and watchdog status, and kept in sync with Android 13+ System App Language Settings. |
@@ -227,7 +255,7 @@ The reconnect watchdog has no user setting. It is reconciled automatically from 
 
 The fullscreen onboarding wizard reports whether AltShift is enabled and selected, requests notification permission on Android 13+, provides a one-tap overlay permission action, and requests a battery optimization exemption so the service survives Doze mode. The dashboard shows a toolbar status badge, the language shortcut card, the auto-switch toggle, and the app hotkey list. App shortcuts are stored per package and can be removed from the list.
 
-On some manufacturer ROMs, the Doze exemption alone is not enough for post-reboot startup: Lenovo ZUI, Xiaomi HyperOS, and ColorOS can block `BOOT_COMPLETED` until **Auto-start** is enabled for AltShift in the system app settings. Enable that vendor toggle once to let monitoring resume automatically after a reboot. AltShift itself stays 100% AOSP with no vendor-specific branches; this is a user-side OEM control, not an app permission.
+> **Note:** On some manufacturer ROMs, the Doze exemption alone is not enough for post-reboot startup: Lenovo ZUI, Xiaomi HyperOS, and ColorOS can block `BOOT_COMPLETED` until **Auto-start** is enabled for AltShift in the system app settings. Enable that vendor toggle once to let monitoring resume automatically after a reboot. AltShift itself stays 100% AOSP with no vendor-specific branches; this is a user-side OEM control, not an app permission.
 
 Configuration data lives in the app's private `SharedPreferences` file (`altshift_prefs`). Uninstalling the application removes it.
 
