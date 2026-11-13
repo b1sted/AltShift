@@ -12,8 +12,10 @@ import ru.b1sted.altshift.R;
  */
 public final class NotificationChannels {
 
-    public static final String KEYBOARD_ALERTS = "altshift_keyboard_alerts";
+    public static final String KEYBOARD_ALERTS = "altshift_keyboard_alerts_v2";
+    public static final String KEYBOARD_ALERTS_URGENT = "altshift_keyboard_alerts_urgent";
     public static final String SAFETY_WARNINGS = "altshift_safety_warnings";
+    public static final String KEYBOARD_WATCHDOG = "altshift_keyboard_watchdog";
 
     private static final String TAG = "AltShift";
     private static final String[] LEGACY_IDS = {
@@ -22,7 +24,8 @@ public final class NotificationChannels {
             "keyboard_state_v2",
             "keyboard_state_v3",
             "warning_channel",
-            "warning_channel_v2"
+            "warning_channel_v2",
+            "altshift_keyboard_alerts"
     };
 
     private NotificationChannels() {
@@ -41,7 +44,9 @@ public final class NotificationChannels {
 
             deleteLegacy(manager);
             ensureKeyboardAlerts(context, manager);
+            ensureKeyboardAlertsUrgent(context, manager);
             ensureSafetyWarnings(context, manager);
+            ensureKeyboardWatchdog(context, manager);
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to initialize notification channels", exception);
         }
@@ -61,9 +66,26 @@ public final class NotificationChannels {
         NotificationChannel channel = new NotificationChannel(
                 KEYBOARD_ALERTS,
                 context.getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_HIGH);
+                NotificationManager.IMPORTANCE_DEFAULT);
         channel.setDescription(context.getString(
                 R.string.notification_channel_description));
+        channel.enableVibration(true);
+
+        manager.createNotificationChannel(channel);
+    }
+
+    private static void ensureKeyboardAlertsUrgent(
+            Context context, NotificationManager manager) {
+        if (manager.getNotificationChannel(KEYBOARD_ALERTS_URGENT) != null) {
+            return;
+        }
+
+        NotificationChannel channel = new NotificationChannel(
+                KEYBOARD_ALERTS_URGENT,
+                context.getString(R.string.notification_urgent_channel_name),
+                NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription(context.getString(
+                R.string.notification_urgent_channel_description));
         channel.enableVibration(true);
 
         manager.createNotificationChannel(channel);
@@ -81,6 +103,24 @@ public final class NotificationChannels {
         channel.setDescription(context.getString(
                 R.string.notification_warning_channel_description));
         channel.enableVibration(true);
+
+        manager.createNotificationChannel(channel);
+    }
+
+    private static void ensureKeyboardWatchdog(Context context, NotificationManager manager) {
+        if (manager.getNotificationChannel(KEYBOARD_WATCHDOG) != null) {
+            return;
+        }
+
+        NotificationChannel channel = new NotificationChannel(
+                KEYBOARD_WATCHDOG,
+                context.getString(R.string.notification_watchdog_channel_name),
+                NotificationManager.IMPORTANCE_MIN);
+        channel.setDescription(context.getString(
+                R.string.notification_watchdog_channel_description));
+        channel.enableVibration(false);
+        channel.setSound(null, null);
+        channel.setShowBadge(false);
 
         manager.createNotificationChannel(channel);
     }

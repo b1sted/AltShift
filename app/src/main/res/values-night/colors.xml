@@ -16,5 +16,7 @@
     <color name="brand_error">#FFB4AB</color>
     <color name="brand_on_error">#690005</color>
     <color name="brand_success">#81C784</color>
+    <color name="prompt_surface">#252630</color>
+    <color name="prompt_stroke">#24FFFFFF</color>
     <color name="ic_launcher_background">#3F51B5</color>
 </resources>

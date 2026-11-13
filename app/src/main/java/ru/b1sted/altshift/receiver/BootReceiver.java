@@ -12,6 +12,7 @@ import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardNotification;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
 import ru.b1sted.altshift.service.KeyboardPromptOverlay;
+import ru.b1sted.altshift.service.KeyboardWatchdogService;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.ui.SwitchBackActivity;
 import ru.b1sted.altshift.util.PermissionHelper;
@@ -31,6 +32,12 @@ public final class BootReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        String action = intent == null ? null : intent.getAction();
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(action)
+                && !Intent.ACTION_USER_PRESENT.equals(action)) {
+            return;
+        }
+
         handleIntent(context, intent);
     }
 
@@ -103,20 +110,28 @@ public final class BootReceiver extends BroadcastReceiver {
 
         try {
             HotkeyRepository repository = HotkeyRepository.getInstance(appContext);
-            if (!repository.isOnboardingCompleted() || !repository.isAutoSwitchEnabled()) {
+            if (!repository.isOnboardingCompleted()) {
                 return;
             }
 
-            boolean canSwitch = InputMethodSwitcher.hasSecureSettingsPermission(appContext);
+            // Interactive recovery is independent from the auto-switch
+            // preference: only autonomous switches require the preference.
+            boolean canSwitch = repository.isAutoSwitchEnabled()
+                    && InputMethodSwitcher.hasSecureSettingsPermission(appContext);
             boolean canPrompt = PermissionHelper.canDrawOverlays(appContext);
             boolean canNotify = KeyboardNotification.canPost(appContext);
             if (!canSwitch && !canPrompt && !canNotify) {
                 return;
             }
 
+            boolean keyboardPresent = KeyboardPresenceMonitor
+                    .isPhysicalKeyboardAvailable(appContext);
+
             HardwareInputService.startKeyboardMonitor(appContext);
 
-            if (!KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(appContext)) {
+            if (!keyboardPresent) {
+                KeyboardWatchdogService.reconcile(appContext, false);
+
                 return;
             }
 
@@ -127,10 +142,13 @@ public final class BootReceiver extends BroadcastReceiver {
                     Log.w(TAG, "Unable to restore AltShift after " + action);
                 }
 
+                KeyboardWatchdogService.reconcile(appContext, true);
+
                 return;
             }
 
             showReconnectPromptIfNeeded(appContext);
+            KeyboardWatchdogService.reconcile(appContext, true);
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to reconcile the keyboard state after " + action, exception);
         }
@@ -147,6 +165,26 @@ public final class BootReceiver extends BroadcastReceiver {
             return;
         }
 
-        KeyboardPromptOverlay.show(context, () -> SwitchBackActivity.start(context));
+        KeyboardNotification.cancel(context);
+        KeyboardPromptOverlay.show(
+                context,
+                () -> SwitchBackActivity.start(context),
+                () -> onPromptDismissed(context));
+    }
+
+    /**
+     * A closed or timed-out prompt posts a standard reminder only while the
+     * keyboard is still attached and AltShift remains inactive.
+     */
+    private static void onPromptDismissed(Context context) {
+        if (!KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(context)) {
+            return;
+        }
+
+        if (InputMethodSwitcher.isAltShiftActive(context)) {
+            return;
+        }
+
+        KeyboardNotification.showInactive(context);
     }
 }

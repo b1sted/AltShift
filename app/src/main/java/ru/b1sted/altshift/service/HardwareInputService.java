@@ -356,6 +356,8 @@ public final class HardwareInputService extends InputMethodService {
         try {
             InputConnection connection = getCurrentInputConnection();
             if (connection == null) {
+                Log.w(TAG, "InputConnection is null during commitMapped");
+
                 return false;
             }
 
@@ -506,6 +508,10 @@ public final class HardwareInputService extends InputMethodService {
             if (serviceRef.get() == service) {
                 serviceRef.clear();
             }
+
+            // The IME binding may disappear before the settings observer fires,
+            // so the watchdog is reconciled as soon as the service is released.
+            inputHandler.post(() -> KeyboardWatchdogService.reconcile(appContext));
         }
 
         private void scheduleCheckInternal() {
@@ -561,6 +567,10 @@ public final class HardwareInputService extends InputMethodService {
             keyboardPresent = present;
             alternativeImeAvailable = alternative;
             initialized = true;
+
+            // Reconcile before applying the transition so a pending detach
+            // hand-off is not cancelled by the active-IME check of this cycle.
+            KeyboardWatchdogService.reconcile(appContext, present);
 
             if (changed) {
                 Log.i(TAG, "Keyboard state changed: present=" + present
@@ -622,16 +632,25 @@ public final class HardwareInputService extends InputMethodService {
 
             if (isAutoSwitchPreferenceEnabled()
                     && InputMethodSwitcher.switchToAltShift(appContext)) {
+                KeyboardWatchdogService.stop(appContext);
+                KeyboardNotification.cancel(appContext);
                 KeyboardPromptOverlay.dismissActive();
 
                 return;
             }
 
             if (InputMethodSwitcher.isAltShiftActive(appContext)) {
+                KeyboardWatchdogService.stop(appContext);
+                KeyboardNotification.cancel(appContext);
                 KeyboardPromptOverlay.dismissActive();
 
                 return;
             }
+
+            // The user stays on another IME. Keep the watchdog alive so this
+            // process still observes the next disconnect and can show the
+            // Dynamic Island again after a reconnect.
+            KeyboardWatchdogService.reconcile(appContext, true);
 
             KeyboardNotification.cancel(appContext);
             mainHandler.post(this::showReconnectPrompt);
@@ -639,38 +658,70 @@ public final class HardwareInputService extends InputMethodService {
 
         private void applyKeyboardDetached(boolean alternative) {
             KeyboardPromptOverlay.dismissActive();
+            KeyboardNotification.cancel(appContext);
 
             if (autoSwitchSuppressed) {
+                ensureWatchdog();
+
                 return;
             }
 
             if (!alternative || !isAutoSwitchPreferenceEnabled()) {
+                ensureWatchdog();
+
                 return;
             }
 
+            // Start while the IME binding is still alive: the platform accepts
+            // the foreground-service transition in this state even without an
+            // overlay or battery-optimization exemption.
+            KeyboardWatchdogService.startWhileDetached(appContext);
+
             HardwareInputService service = serviceRef.get();
             if (service == null) {
-                switchToSoftKeyboardThroughSettings();
+                applySettingsSwitchAndWatchdog();
 
                 return;
             }
 
             mainHandler.post(() -> {
                 if (service.switchToSoftKeyboardFromIme()) {
+                    inputHandler.post(
+                            () -> KeyboardWatchdogService.startWhileDetached(appContext));
+
                     return;
                 }
 
-                inputHandler.post(this::switchToSoftKeyboardThroughSettings);
+                inputHandler.post(this::applySettingsSwitchAndWatchdog);
             });
         }
 
-        private void switchToSoftKeyboardThroughSettings() {
-            if (!InputMethodSwitcher.isAltShiftActive(appContext)
-                    || !InputMethodSwitcher.hasSecureSettingsPermission(appContext)) {
+        private void ensureWatchdog() {
+            KeyboardWatchdogService.reconcile(appContext, false);
+        }
+
+        /**
+         * Falls back to the secure-settings switch and keeps the watchdog alive
+         * when the hand-off succeeded. The active-IME read can lag behind the
+         * write, so it is not used to stop a watchdog started for a real switch.
+         */
+        private void applySettingsSwitchAndWatchdog() {
+            if (switchToSoftKeyboardThroughSettings()) {
+                KeyboardWatchdogService.startWhileDetached(appContext);
+
                 return;
             }
 
-            InputMethodSwitcher.switchToSoftKeyboard(appContext);
+            ensureWatchdog();
+        }
+
+        private boolean switchToSoftKeyboardThroughSettings() {
+            if (!InputMethodSwitcher.isAltShiftActive(appContext)
+                    || !InputMethodSwitcher.hasSecureSettingsPermission(appContext)) {
+                return false;
+            }
+
+            return InputMethodSwitcher.switchToSoftKeyboard(appContext);
         }
 
         private boolean isAutoSwitchPreferenceEnabled() {
@@ -700,6 +751,8 @@ public final class HardwareInputService extends InputMethodService {
             if (InputMethodSwitcher.isAltShiftActive(appContext)) {
                 KeyboardNotification.cancel(appContext);
             }
+
+            KeyboardWatchdogService.reconcile(appContext);
         }
 
         private void switchToSoftKeyboard(boolean showPickerOnFailure) {
@@ -719,11 +772,27 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         private void showReconnectPrompt() {
-            if (KeyboardPromptOverlay.show(appContext, this::requestPickerSwitch)) {
+            KeyboardNotification.cancel(appContext);
+
+            if (KeyboardPromptOverlay.show(
+                    appContext, this::requestPickerSwitch, this::onPromptDismissed)) {
                 return;
             }
 
             Log.i(TAG, "Overlay unavailable; waiting for an explicit switch attempt");
+        }
+
+        /**
+         * A closed or timed-out prompt leaves the user on the soft keyboard, so
+         * it posts a standard (non-heads-up) reminder. The explicit switch
+         * action is graded by {@link SwitchBackActivity} instead.
+         */
+        private void onPromptDismissed() {
+            if (!keyboardPresent || InputMethodSwitcher.isAltShiftActive(appContext)) {
+                return;
+            }
+
+            KeyboardNotification.showInactive(appContext);
         }
 
         private void showInputMethodPicker() {

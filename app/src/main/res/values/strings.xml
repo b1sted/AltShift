@@ -37,11 +37,11 @@
     <string name="onboarding_finish_anyway">FINISH ANYWAY</string>
 
     <string name="onboarding_background_title">Background execution</string>
-    <string name="onboarding_background_description">Keep AltShift awake after long idle periods.</string>
+    <string name="onboarding_background_description">Keep AltShift awake after idle periods and allow it to restart after a reboot.</string>
     <string name="onboarding_background_granted">✓ Unrestricted</string>
     <string name="onboarding_background_restricted">Optimized/restricted</string>
     <string name="onboarding_background_action">ALLOW BACKGROUND RUNNING</string>
-    <string name="onboarding_background_rationale">Android may put AltShift to sleep during long idle periods, which disables hotkeys after the tablet has been unused overnight.\n\nThe next screen asks you to confirm that AltShift can always run in the background.</string>
+    <string name="onboarding_background_rationale">Android may put AltShift to sleep during long idle periods, which disables hotkeys after the tablet has been unused overnight.\n\nOn some manufacturer ROMs (for example Lenovo ZUI, Xiaomi HyperOS, or ColorOS), also enable Auto-start in the system app settings so AltShift can start again after a reboot.\n\nThe next screen asks you to confirm that AltShift can always run in the background.</string>
     <string name="onboarding_background_continue">CONTINUE</string>
     <string name="onboarding_background_cancel">Cancel</string>
     <string name="onboarding_background_failed">Unable to open battery optimization settings.</string>
@@ -81,6 +81,8 @@
 
     <string name="notification_channel_name">Keyboard Connection Alerts</string>
     <string name="notification_channel_description">Alerts when a physical keyboard connects or when AltShift is paused</string>
+    <string name="notification_urgent_channel_name">Keyboard Switch Required</string>
+    <string name="notification_urgent_channel_description">Heads-up reminder when the keyboard picker closes without reactivating AltShift</string>
     <string name="notification_inactive_title">AltShift is inactive</string>
     <string name="notification_inactive_text">Physical keyboard connected, but another on-screen keyboard is selected. Hotkeys and transliteration are paused.</string>
     <string name="notification_switch_back">Switch back</string>
@@ -89,6 +91,12 @@
     <string name="notification_no_keyboard_title">No on-screen keyboard available</string>
     <string name="notification_no_keyboard_text">AltShift is the only enabled keyboard. Enable a virtual keyboard in settings so you can type without a physical keyboard.</string>
     <string name="notification_keyboard_settings">Keyboard Settings</string>
+    <string name="notification_watchdog_channel_name">Keyboard Reconnect Monitor</string>
+    <string name="notification_watchdog_channel_description">Silent status shown while AltShift monitors the keyboard connection and waits to become active again</string>
+    <string name="notification_watchdog_title">Waiting for physical keyboard</string>
+    <string name="notification_watchdog_text">Connect a hardware keyboard to resume AltShift. The monitor stops as soon as a keyboard is attached.</string>
+    <string name="notification_watchdog_monitoring_title">Monitoring keyboard connection</string>
+    <string name="notification_watchdog_monitoring_text">AltShift stays ready while another keyboard is selected.</string>
     <string name="prompt_keyboard_reconnected">Keyboard reconnected</string>
     <string name="prompt_dismiss">Dismiss</string>
 
@@ -122,6 +130,8 @@
     <string name="shortcut_saved">Shortcut saved.</string>
     <string name="shortcut_deleted">Shortcut deleted.</string>
     <string name="shortcut_save_failed">Unable to save shortcut.</string>
+    <string name="shortcut_conflict_hotkey">This combination is already assigned to an app shortcut. Delete or change that shortcut first.</string>
+    <string name="shortcut_conflict_language">This combination is already used for the language switch. Choose a different combination.</string>
     <string name="settings_open_failed">Unable to open keyboard settings.</string>
     <string name="overlay_settings_failed">Unable to open overlay settings.</string>
     <string name="ime_picker_failed">Unable to open the keyboard picker.</string>

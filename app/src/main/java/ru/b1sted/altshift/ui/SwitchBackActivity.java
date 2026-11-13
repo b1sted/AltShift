@@ -173,7 +173,7 @@ public final class SwitchBackActivity extends Activity {
         pickerDismissed = true;
 
         if (!InputMethodSwitcher.isAltShiftActive(this)) {
-            KeyboardNotification.showInactive(this);
+            KeyboardNotification.showInactiveHeadsUp(this);
 
             return;
         }

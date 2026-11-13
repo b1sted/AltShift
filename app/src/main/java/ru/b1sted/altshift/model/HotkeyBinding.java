@@ -38,4 +38,15 @@ public record HotkeyBinding(
                 shift,
                 meta);
     }
+
+    public boolean conflictsWith(LanguageSwitchShortcut shortcut) {
+        Objects.requireNonNull(shortcut, "shortcut");
+
+        return matches(
+                shortcut.keyCode(),
+                shortcut.isCtrl(),
+                shortcut.isAlt(),
+                shortcut.isShift(),
+                shortcut.isMeta());
+    }
 }

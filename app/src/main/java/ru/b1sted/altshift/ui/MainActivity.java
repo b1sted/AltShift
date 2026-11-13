@@ -39,6 +39,8 @@ import ru.b1sted.altshift.service.HardwareInputService;
 import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardNotification;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
+import ru.b1sted.altshift.service.KeyboardWatchdogService;
+import ru.b1sted.altshift.storage.HotkeyBindingStore;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.util.PermissionHelper;
 
@@ -473,6 +475,25 @@ public final class MainActivity extends AppCompatActivity {
         if (enabled || canPrompt) {
             HardwareInputService.startKeyboardMonitor(this);
         }
+
+        reconcileKeyboardWatchdog();
+    }
+
+    /**
+     * Watchdog conditions read input devices and input-method settings, so they
+     * are evaluated on the status worker instead of the main thread.
+     */
+    private void reconcileKeyboardWatchdog() {
+        Context appContext = getApplicationContext();
+        if (appContext == null) {
+            return;
+        }
+
+        try {
+            statusExecutor.execute(() -> KeyboardWatchdogService.reconcile(appContext));
+        } catch (RejectedExecutionException exception) {
+            Log.w(TAG, "Watchdog reconciliation rejected during teardown", exception);
+        }
     }
 
     private void showThemeDialog() {
@@ -497,12 +518,15 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private int themeLabelRes(ThemeMode mode) {
-        return switch (mode) {
-            case LIGHT -> R.string.theme_light;
-            case DARK -> R.string.theme_dark;
-            case FOLLOW_SYSTEM -> R.string.theme_system;
-            default -> R.string.theme_system;
-        };
+        if (mode == ThemeMode.DARK) {
+            return R.string.theme_dark;
+        }
+
+        if (mode == ThemeMode.LIGHT) {
+            return R.string.theme_light;
+        }
+
+        return R.string.theme_system;
     }
 
     private void refreshLanguageShortcut() {
@@ -526,8 +550,16 @@ public final class MainActivity extends AppCompatActivity {
     private void saveLanguageShortcut(
             int keyCode, boolean ctrl, boolean alt, boolean shift, boolean meta) {
         try {
-            repository.saveLanguageShortcut(new LanguageSwitchShortcut(
-                    keyCode, ctrl, alt, shift, meta));
+            LanguageSwitchShortcut candidate = new LanguageSwitchShortcut(
+                    keyCode, ctrl, alt, shift, meta);
+
+            if (hasAppHotkeyConflict(candidate)) {
+                toast(R.string.shortcut_conflict_hotkey);
+
+                return;
+            }
+
+            repository.saveLanguageShortcut(candidate);
             refreshLanguageShortcut();
             toast(R.string.shortcut_saved);
         } catch (RuntimeException exception) {
@@ -536,14 +568,34 @@ public final class MainActivity extends AppCompatActivity {
         }
     }
 
+    private boolean hasAppHotkeyConflict(LanguageSwitchShortcut shortcut) {
+        return HotkeyBindingStore.conflictsWith(repository.getBindings(), shortcut);
+    }
+
     private void addHotkey() {
         KeyCaptureDialog.show(this, null, this::showAppPicker, true);
     }
 
     private void showAppPicker(
             int keyCode, boolean ctrl, boolean alt, boolean shift, boolean meta) {
+        if (conflictsWithLanguageShortcut(keyCode, ctrl, alt, shift, meta)) {
+            toast(R.string.shortcut_conflict_language);
+
+            return;
+        }
+
         AppPickerDialog.show(this, (appName, packageName) ->
                 saveHotkey(keyCode, ctrl, alt, shift, meta, appName, packageName));
+    }
+
+    private boolean conflictsWithLanguageShortcut(
+            int keyCode, boolean ctrl, boolean alt, boolean shift, boolean meta) {
+        LanguageSwitchShortcut shortcut = repository.getLanguageShortcut();
+        if (shortcut == null) {
+            return false;
+        }
+
+        return shortcut.matches(keyCode, ctrl, alt, shift, meta);
     }
 
     private void saveHotkey(
@@ -554,6 +606,12 @@ public final class MainActivity extends AppCompatActivity {
             boolean meta,
             String appName,
             String packageName) {
+        if (conflictsWithLanguageShortcut(keyCode, ctrl, alt, shift, meta)) {
+            toast(R.string.shortcut_conflict_language);
+
+            return;
+        }
+
         try {
             repository.saveBinding(new HotkeyBinding(
                     keyCode,

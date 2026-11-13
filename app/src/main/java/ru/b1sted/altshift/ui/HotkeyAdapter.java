@@ -1,6 +1,5 @@
 package ru.b1sted.altshift.ui;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
@@ -12,6 +11,8 @@ import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.lang.ref.WeakReference;
@@ -30,9 +31,30 @@ import ru.b1sted.altshift.databinding.ItemHotkeyBinding;
 import ru.b1sted.altshift.model.HotkeyBinding;
 
 public final class HotkeyAdapter
-        extends RecyclerView.Adapter<HotkeyAdapter.HotkeyViewHolder> {
+        extends ListAdapter<HotkeyBinding, HotkeyAdapter.HotkeyViewHolder> {
 
     private static final String TAG = "AltShift";
+    private static final int ICON_CACHE_SIZE = 32;
+
+    private static final DiffUtil.ItemCallback<HotkeyBinding> DIFF_CALLBACK =
+            new DiffUtil.ItemCallback<>() {
+                @Override
+                public boolean areItemsTheSame(
+                        @NonNull HotkeyBinding oldItem, @NonNull HotkeyBinding newItem) {
+                    return oldItem.matches(
+                            newItem.keyCode(),
+                            newItem.isCtrl(),
+                            newItem.isAlt(),
+                            newItem.isShift(),
+                            newItem.isMeta());
+                }
+
+                @Override
+                public boolean areContentsTheSame(
+                        @NonNull HotkeyBinding oldItem, @NonNull HotkeyBinding newItem) {
+                    return oldItem.equals(newItem);
+                }
+            };
 
     public interface OnDeleteListener {
         void onDelete(HotkeyBinding binding);
@@ -41,8 +63,8 @@ public final class HotkeyAdapter
     private final Context context;
     private final PackageManager packageManager;
     private final OnDeleteListener deleteListener;
-    private final List<HotkeyBinding> items = new ArrayList<>();
-    private final LruCache<String, Drawable> iconCache = new LruCache<>(32);
+    private final LruCache<String, Drawable> iconCache =
+            new LruCache<>(ICON_CACHE_SIZE);
     private final Set<String> pendingIcons = new HashSet<>();
     private final Map<String, List<WeakReference<HotkeyViewHolder>>> pendingHolders =
             new HashMap<>();
@@ -54,27 +76,22 @@ public final class HotkeyAdapter
         return thread;
     });
 
-    private boolean shutDown;
+    private volatile boolean shutDown;
 
     public HotkeyAdapter(Context context, OnDeleteListener deleteListener) {
+        super(DIFF_CALLBACK);
+
         this.context = context.getApplicationContext();
         packageManager = context.getPackageManager();
         this.deleteListener = deleteListener;
     }
 
-    @SuppressLint("NotifyDataSetChanged")
     public void submit(HotkeyBinding[] bindings) {
         if (shutDown) {
             return;
         }
 
-        items.clear();
-
-        for (int index = 0; index < bindings.length; index++) {
-            items.add(bindings[index]);
-        }
-
-        notifyDataSetChanged();
+        submitList(List.of(bindings));
     }
 
     public void shutdown() {
@@ -84,7 +101,7 @@ public final class HotkeyAdapter
         pendingIcons.clear();
         pendingHolders.clear();
         iconCache.evictAll();
-        items.clear();
+        submitList(null);
     }
 
     @NonNull
@@ -100,7 +117,7 @@ public final class HotkeyAdapter
     @Override
     public void onBindViewHolder(
             @NonNull HotkeyViewHolder holder, int position) {
-        HotkeyBinding binding = items.get(position);
+        HotkeyBinding binding = getItem(position);
 
         holder.binding.appName.setText(binding.appName());
         holder.binding.packageName.setText(binding.packageName());
@@ -111,11 +128,6 @@ public final class HotkeyAdapter
                 view -> deleteListener.onDelete(binding));
 
         bindIcon(holder, binding);
-    }
-
-    @Override
-    public int getItemCount() {
-        return items.size();
     }
 
     private void bindIcon(HotkeyViewHolder holder, HotkeyBinding binding) {
@@ -135,6 +147,16 @@ public final class HotkeyAdapter
             return;
         }
 
+        registerPendingHolder(packageName, holder);
+
+        if (!pendingIcons.add(packageName)) {
+            return;
+        }
+
+        submitIconLoad(packageName);
+    }
+
+    private void registerPendingHolder(String packageName, HotkeyViewHolder holder) {
         List<WeakReference<HotkeyViewHolder>> holders = pendingHolders.get(packageName);
         if (holders == null) {
             holders = new ArrayList<>(2);
@@ -142,46 +164,53 @@ public final class HotkeyAdapter
         }
 
         holders.add(new WeakReference<>(holder));
+    }
 
-        if (!pendingIcons.add(packageName)) {
-            return;
-        }
-
+    private void submitIconLoad(String packageName) {
         try {
-            iconExecutor.execute(() -> {
-                Drawable icon = loadIcon(packageName);
-
-                mainHandler.post(() -> {
-                    if (shutDown) {
-                        return;
-                    }
-
-                    pendingIcons.remove(packageName);
-                    List<WeakReference<HotkeyViewHolder>> waiting =
-                            pendingHolders.remove(packageName);
-
-                    if (icon == null) {
-                        return;
-                    }
-
-                    iconCache.put(packageName, icon);
-
-                    if (waiting == null) {
-                        return;
-                    }
-
-                    for (int index = 0; index < waiting.size(); index++) {
-                        HotkeyViewHolder currentHolder = waiting.get(index).get();
-                        if (currentHolder != null) {
-                            applyIconIfBound(currentHolder, packageName, icon);
-                        }
-                    }
-                });
-            });
+            iconExecutor.execute(() -> loadAndPostIcon(packageName));
         } catch (RejectedExecutionException exception) {
             pendingIcons.remove(packageName);
             pendingHolders.remove(packageName);
             Log.w(TAG, "Unable to queue icon loading", exception);
+        }
+    }
+
+    private void loadAndPostIcon(String packageName) {
+        Drawable icon = loadIcon(packageName);
+        mainHandler.post(() -> deliverIconResult(packageName, icon));
+    }
+
+    private void deliverIconResult(String packageName, Drawable icon) {
+        if (shutDown) {
+            return;
+        }
+
+        pendingIcons.remove(packageName);
+        List<WeakReference<HotkeyViewHolder>> waiting =
+                pendingHolders.remove(packageName);
+
+        if (icon == null) {
+            return;
+        }
+
+        iconCache.put(packageName, icon);
+        deliverIconToHolders(waiting, packageName, icon);
+    }
+
+    private void deliverIconToHolders(
+            List<WeakReference<HotkeyViewHolder>> holders,
+            String packageName,
+            Drawable icon) {
+        if (holders == null) {
+            return;
+        }
+
+        for (int index = 0; index < holders.size(); index++) {
+            HotkeyViewHolder holder = holders.get(index).get();
+            if (holder != null) {
+                applyIconIfBound(holder, packageName, icon);
+            }
         }
     }
 
@@ -198,12 +227,12 @@ public final class HotkeyAdapter
     private void applyIconIfBound(
             HotkeyViewHolder holder, String packageName, Drawable icon) {
         int position = holder.getBindingAdapterPosition();
-        if (position == RecyclerView.NO_POSITION || position >= items.size()) {
+        if (position == RecyclerView.NO_POSITION || position >= getItemCount()) {
             return;
         }
 
-        HotkeyBinding current = items.get(position);
-        if (!packageName.equals(current.packageName())) {
+        HotkeyBinding current = getItem(position);
+        if (current == null || !packageName.equals(current.packageName())) {
             return;
         }
 

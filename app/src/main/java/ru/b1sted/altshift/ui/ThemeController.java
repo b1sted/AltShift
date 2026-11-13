@@ -27,11 +27,14 @@ public final class ThemeController {
     }
 
     private static int nightMode(ThemeMode mode) {
-        return switch (mode) {
-            case LIGHT -> AppCompatDelegate.MODE_NIGHT_NO;
-            case DARK -> AppCompatDelegate.MODE_NIGHT_YES;
-            case FOLLOW_SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
-            default -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
-        };
+        if (mode == ThemeMode.DARK) {
+            return AppCompatDelegate.MODE_NIGHT_YES;
+        }
+
+        if (mode == ThemeMode.LIGHT) {
+            return AppCompatDelegate.MODE_NIGHT_NO;
+        }
+
+        return AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
     }
 }
