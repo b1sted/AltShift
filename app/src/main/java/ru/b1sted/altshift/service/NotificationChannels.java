@@ -12,7 +12,7 @@ import ru.b1sted.altshift.R;
  */
 public final class NotificationChannels {
 
-    public static final String KEYBOARD_ALERTS = "altshift_keyboard_alerts";
+    public static final String KEYBOARD_ALERTS = "altshift_keyboard_alerts_v2";
     public static final String SAFETY_WARNINGS = "altshift_safety_warnings";
     public static final String KEYBOARD_WATCHDOG = "altshift_keyboard_watchdog";
 
@@ -23,7 +23,8 @@ public final class NotificationChannels {
             "keyboard_state_v2",
             "keyboard_state_v3",
             "warning_channel",
-            "warning_channel_v2"
+            "warning_channel_v2",
+            "altshift_keyboard_alerts"
     };
 
     private NotificationChannels() {
@@ -63,7 +64,7 @@ public final class NotificationChannels {
         NotificationChannel channel = new NotificationChannel(
                 KEYBOARD_ALERTS,
                 context.getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_HIGH);
+                NotificationManager.IMPORTANCE_DEFAULT);
         channel.setDescription(context.getString(
                 R.string.notification_channel_description));
         channel.enableVibration(true);

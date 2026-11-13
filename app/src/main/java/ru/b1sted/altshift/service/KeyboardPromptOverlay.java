@@ -32,6 +32,7 @@ public final class KeyboardPromptOverlay {
     private static final String TAG = "AltShift";
     private static final long AUTO_DISMISS_MS = 12000L;
     private static final int FALLBACK_BOTTOM_PADDING_DP = 16;
+    private static final int BOTTOM_OFFSET_DP = 8;
     private static final int PROMPT_HORIZONTAL_MARGIN_DP = 16;
     private static final int TABLET_MIN_WIDTH_DP = 600;
     private static final Object LOCK = new Object();
@@ -42,10 +43,11 @@ public final class KeyboardPromptOverlay {
     private final Context context;
     private final WindowManager windowManager;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Runnable dismissRunnable = this::dismiss;
+    private final Runnable dismissRunnable = this::dismissByUser;
 
     private ViewKeyboardPromptBinding binding;
     private Runnable onSwitch;
+    private Runnable onDismissed;
     private volatile boolean shown;
 
     private KeyboardPromptOverlay(Context context) {
@@ -54,6 +56,16 @@ public final class KeyboardPromptOverlay {
     }
 
     public static boolean show(Context context, Runnable onSwitch) {
+        return show(context, onSwitch, null);
+    }
+
+    /**
+     * Shows the overlay and reports a user-driven dismissal. The callback runs
+     * only when the user taps the close button or the timer expires; an
+     * explicit switch action and programmatic {@link #dismissActive()} never
+     * invoke it.
+     */
+    public static boolean show(Context context, Runnable onSwitch, Runnable onDismissed) {
         if (context == null || onSwitch == null) {
             return false;
         }
@@ -75,14 +87,14 @@ public final class KeyboardPromptOverlay {
         synchronized (LOCK) {
             KeyboardPromptOverlay current = active;
             if (current != null && current.shown) {
-                current.refreshAutoDismiss(onSwitch);
+                current.refreshAutoDismiss(onSwitch, onDismissed);
 
                 return true;
             }
         }
 
         KeyboardPromptOverlay overlay = new KeyboardPromptOverlay(appContext);
-        if (!overlay.showInternal(onSwitch)) {
+        if (!overlay.showInternal(onSwitch, onDismissed)) {
             return false;
         }
 
@@ -99,9 +111,10 @@ public final class KeyboardPromptOverlay {
         return true;
     }
 
-    private void refreshAutoDismiss(Runnable switchAction) {
+    private void refreshAutoDismiss(Runnable switchAction, Runnable dismissedAction) {
         synchronized (LOCK) {
             onSwitch = switchAction;
+            onDismissed = dismissedAction;
         }
 
         handler.removeCallbacks(dismissRunnable);
@@ -120,7 +133,7 @@ public final class KeyboardPromptOverlay {
         }
     }
 
-    private boolean showInternal(Runnable switchAction) {
+    private boolean showInternal(Runnable switchAction, Runnable dismissedAction) {
         if (windowManager == null) {
             return false;
         }
@@ -137,9 +150,10 @@ public final class KeyboardPromptOverlay {
             return false;
         }
 
+        configureCardWidth(inflated);
         releaseTextWeightOnTablets(inflated);
         inflated.promptAction.setOnClickListener(view -> runSwitchAction());
-        inflated.promptClose.setOnClickListener(view -> dismiss());
+        inflated.promptClose.setOnClickListener(view -> dismissByUser());
 
         try {
             windowManager.addView(inflated.getRoot(), createParams());
@@ -152,6 +166,7 @@ public final class KeyboardPromptOverlay {
 
         synchronized (LOCK) {
             onSwitch = switchAction;
+            onDismissed = dismissedAction;
             binding = inflated;
             shown = true;
         }
@@ -160,6 +175,21 @@ public final class KeyboardPromptOverlay {
         Log.d(TAG, "Keyboard prompt overlay shown");
 
         return true;
+    }
+
+    /**
+     * The phone window has a fixed inset width, so the card must fill the padded
+     * content area for the weighted message to shrink correctly. The tablet
+     * window wraps the card and keeps its 420dp minimum.
+     */
+    private void configureCardWidth(ViewKeyboardPromptBinding inflated) {
+        if (!isCompactWidth()) {
+            return;
+        }
+
+        ViewGroup.LayoutParams params = inflated.promptCard.getLayoutParams();
+        params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+        inflated.promptCard.setLayoutParams(params);
     }
 
     /**
@@ -194,7 +224,7 @@ public final class KeyboardPromptOverlay {
             action = onSwitch;
         }
 
-        dismiss();
+        dismissInternal(false);
 
         if (action != null) {
             action.run();
@@ -219,24 +249,52 @@ public final class KeyboardPromptOverlay {
     }
 
     /**
+     * Programmatic dismissal used when the keyboard state changes or another
+     * activity takes over. It never posts a fallback notification.
+     */
+    public void dismiss() {
+        dismissInternal(false);
+    }
+
+    /**
+     * User-driven dismissal through the close button or the auto-dismiss timer.
+     */
+    private void dismissByUser() {
+        dismissInternal(true);
+    }
+
+    /**
      * Clears the logical state synchronously, then detaches the view on the main
      * thread. A failed detach can never leave {@link #shown} stuck as true.
      */
-    public void dismiss() {
+    private void dismissInternal(boolean notifyDismissed) {
         handler.removeCallbacks(dismissRunnable);
 
+        Runnable dismissedAction;
         synchronized (LOCK) {
             shown = false;
             onSwitch = null;
+            dismissedAction = notifyDismissed ? onDismissed : null;
+            onDismissed = null;
         }
 
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            handler.post(this::removePromptView);
+            handler.post(() -> {
+                removePromptView();
+
+                if (dismissedAction != null) {
+                    dismissedAction.run();
+                }
+            });
 
             return;
         }
 
         removePromptView();
+
+        if (dismissedAction != null) {
+            dismissedAction.run();
+        }
     }
 
     private void removePromptView() {
@@ -282,7 +340,7 @@ public final class KeyboardPromptOverlay {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-        params.y = bottomInset() + dp(24);
+        params.y = bottomInset() + dp(BOTTOM_OFFSET_DP);
         params.windowAnimations = R.style.Animation_AltShift_Prompt;
 
         return params;

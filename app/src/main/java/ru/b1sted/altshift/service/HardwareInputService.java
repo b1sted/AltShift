@@ -766,11 +766,27 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         private void showReconnectPrompt() {
-            if (KeyboardPromptOverlay.show(appContext, this::requestPickerSwitch)) {
+            KeyboardNotification.cancel(appContext);
+
+            if (KeyboardPromptOverlay.show(
+                    appContext, this::requestPickerSwitch, this::onPromptDismissed)) {
                 return;
             }
 
             Log.i(TAG, "Overlay unavailable; waiting for an explicit switch attempt");
+        }
+
+        /**
+         * A closed or timed-out prompt leaves the user on the soft keyboard, so
+         * it posts a standard (non-heads-up) reminder. The explicit switch
+         * action is graded by {@link SwitchBackActivity} instead.
+         */
+        private void onPromptDismissed() {
+            if (!keyboardPresent || InputMethodSwitcher.isAltShiftActive(appContext)) {
+                return;
+            }
+
+            KeyboardNotification.showInactive(appContext);
         }
 
         private void showInputMethodPicker() {

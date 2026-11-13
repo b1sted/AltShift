@@ -161,6 +161,26 @@ public final class BootReceiver extends BroadcastReceiver {
             return;
         }
 
-        KeyboardPromptOverlay.show(context, () -> SwitchBackActivity.start(context));
+        KeyboardNotification.cancel(context);
+        KeyboardPromptOverlay.show(
+                context,
+                () -> SwitchBackActivity.start(context),
+                () -> onPromptDismissed(context));
+    }
+
+    /**
+     * A closed or timed-out prompt posts a standard reminder only while the
+     * keyboard is still attached and AltShift remains inactive.
+     */
+    private static void onPromptDismissed(Context context) {
+        if (!KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(context)) {
+            return;
+        }
+
+        if (InputMethodSwitcher.isAltShiftActive(context)) {
+            return;
+        }
+
+        KeyboardNotification.showInactive(context);
     }
 }
