@@ -50,6 +50,7 @@ When a physical keyboard connects or disconnects, AltShift can switch input meth
 - **Global app shortcuts**: Bind any hardware key combination to an installed application. Shortcuts are dispatched directly through the launcher intent and consume only the combinations the user defines.
 - **Tablet Dynamic Island**: A 420dp floating capsule with a one-tap action that opens the direct system IME picker, designed for tablets and large screens.
 - **Dual-mode keyboard switching**: AltShift returns natively to the on-screen keyboard when the hardware keyboard is detached, and can additionally switch autonomously on attach and detach when `WRITE_SECURE_SETTINGS` is granted.
+- **Unlock-resilient wake-up**: The receiver also handles `USER_PRESENT`, waking the process on screen unlock and restoring AltShift immediately when a physical keyboard is attached, so platform background freezing cannot leave hardware input disconnected.
 - **Heads-Up alert banners**: The `altshift_keyboard_alerts` and `altshift_safety_warnings` channels surface keyboard and safety events as heads-up notifications. Smart deferred timing shows the inactive-keyboard alert only after the user makes a picker choice, so ignored prompts produce no spam.
 - **Single-IME safety protection**: A dedicated warning fires when AltShift is the only enabled keyboard, preventing a lockout after the hardware keyboard is removed.
 - **Fail-safe service**: External intents, input connection calls, and secure-setting writes are guarded; an IME exception must never take down system input.
