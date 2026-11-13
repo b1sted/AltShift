@@ -356,6 +356,8 @@ public final class HardwareInputService extends InputMethodService {
         try {
             InputConnection connection = getCurrentInputConnection();
             if (connection == null) {
+                Log.w(TAG, "InputConnection is null during commitMapped");
+
                 return false;
             }
 
@@ -506,6 +508,10 @@ public final class HardwareInputService extends InputMethodService {
             if (serviceRef.get() == service) {
                 serviceRef.clear();
             }
+
+            // The IME binding may disappear before the settings observer fires,
+            // so the watchdog is reconciled as soon as the service is released.
+            inputHandler.post(() -> KeyboardWatchdogService.reconcile(appContext));
         }
 
         private void scheduleCheckInternal() {
@@ -562,6 +568,10 @@ public final class HardwareInputService extends InputMethodService {
             alternativeImeAvailable = alternative;
             initialized = true;
 
+            // Reconcile before applying the transition so a pending detach
+            // hand-off is not cancelled by the active-IME check of this cycle.
+            KeyboardWatchdogService.reconcile(appContext, present);
+
             if (changed) {
                 Log.i(TAG, "Keyboard state changed: present=" + present
                         + ", alternative=" + alternative);
@@ -612,6 +622,10 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         private void applyKeyboardAttached() {
+            // The process is bound to a live IME again, so the watchdog is no
+            // longer needed and must not leave a foreground notification behind.
+            KeyboardWatchdogService.stop(appContext);
+
             // A stylus handwriting session holds the input connection, so it must
             // be released before AltShift can take over the physical keyboard.
             HardwareInputService service = serviceRef.get();
@@ -641,36 +655,67 @@ public final class HardwareInputService extends InputMethodService {
             KeyboardPromptOverlay.dismissActive();
 
             if (autoSwitchSuppressed) {
+                ensureWatchdog();
+
                 return;
             }
 
             if (!alternative || !isAutoSwitchPreferenceEnabled()) {
+                ensureWatchdog();
+
                 return;
             }
 
+            // Start while the IME binding is still alive: the platform accepts
+            // the foreground-service transition in this state even without an
+            // overlay or battery-optimization exemption.
+            KeyboardWatchdogService.startWhileDetached(appContext);
+
             HardwareInputService service = serviceRef.get();
             if (service == null) {
-                switchToSoftKeyboardThroughSettings();
+                applySettingsSwitchAndWatchdog();
 
                 return;
             }
 
             mainHandler.post(() -> {
                 if (service.switchToSoftKeyboardFromIme()) {
+                    inputHandler.post(
+                            () -> KeyboardWatchdogService.startWhileDetached(appContext));
+
                     return;
                 }
 
-                inputHandler.post(this::switchToSoftKeyboardThroughSettings);
+                inputHandler.post(this::applySettingsSwitchAndWatchdog);
             });
         }
 
-        private void switchToSoftKeyboardThroughSettings() {
-            if (!InputMethodSwitcher.isAltShiftActive(appContext)
-                    || !InputMethodSwitcher.hasSecureSettingsPermission(appContext)) {
+        private void ensureWatchdog() {
+            KeyboardWatchdogService.reconcile(appContext, keyboardPresent);
+        }
+
+        /**
+         * Falls back to the secure-settings switch and keeps the watchdog alive
+         * when the hand-off succeeded. The active-IME read can lag behind the
+         * write, so it is not used to stop a watchdog started for a real switch.
+         */
+        private void applySettingsSwitchAndWatchdog() {
+            if (switchToSoftKeyboardThroughSettings()) {
+                KeyboardWatchdogService.startWhileDetached(appContext);
+
                 return;
             }
 
-            InputMethodSwitcher.switchToSoftKeyboard(appContext);
+            ensureWatchdog();
+        }
+
+        private boolean switchToSoftKeyboardThroughSettings() {
+            if (!InputMethodSwitcher.isAltShiftActive(appContext)
+                    || !InputMethodSwitcher.hasSecureSettingsPermission(appContext)) {
+                return false;
+            }
+
+            return InputMethodSwitcher.switchToSoftKeyboard(appContext);
         }
 
         private boolean isAutoSwitchPreferenceEnabled() {
@@ -700,6 +745,8 @@ public final class HardwareInputService extends InputMethodService {
             if (InputMethodSwitcher.isAltShiftActive(appContext)) {
                 KeyboardNotification.cancel(appContext);
             }
+
+            KeyboardWatchdogService.reconcile(appContext);
         }
 
         private void switchToSoftKeyboard(boolean showPickerOnFailure) {

@@ -14,6 +14,7 @@ public final class NotificationChannels {
 
     public static final String KEYBOARD_ALERTS = "altshift_keyboard_alerts";
     public static final String SAFETY_WARNINGS = "altshift_safety_warnings";
+    public static final String KEYBOARD_WATCHDOG = "altshift_keyboard_watchdog";
 
     private static final String TAG = "AltShift";
     private static final String[] LEGACY_IDS = {
@@ -42,6 +43,7 @@ public final class NotificationChannels {
             deleteLegacy(manager);
             ensureKeyboardAlerts(context, manager);
             ensureSafetyWarnings(context, manager);
+            ensureKeyboardWatchdog(context, manager);
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to initialize notification channels", exception);
         }
@@ -81,6 +83,24 @@ public final class NotificationChannels {
         channel.setDescription(context.getString(
                 R.string.notification_warning_channel_description));
         channel.enableVibration(true);
+
+        manager.createNotificationChannel(channel);
+    }
+
+    private static void ensureKeyboardWatchdog(Context context, NotificationManager manager) {
+        if (manager.getNotificationChannel(KEYBOARD_WATCHDOG) != null) {
+            return;
+        }
+
+        NotificationChannel channel = new NotificationChannel(
+                KEYBOARD_WATCHDOG,
+                context.getString(R.string.notification_watchdog_channel_name),
+                NotificationManager.IMPORTANCE_MIN);
+        channel.setDescription(context.getString(
+                R.string.notification_watchdog_channel_description));
+        channel.enableVibration(false);
+        channel.setSound(null, null);
+        channel.setShowBadge(false);
 
         manager.createNotificationChannel(channel);
     }

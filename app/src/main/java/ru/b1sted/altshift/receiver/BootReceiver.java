@@ -12,6 +12,7 @@ import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardNotification;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
 import ru.b1sted.altshift.service.KeyboardPromptOverlay;
+import ru.b1sted.altshift.service.KeyboardWatchdogService;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.ui.SwitchBackActivity;
 import ru.b1sted.altshift.util.PermissionHelper;
@@ -103,20 +104,27 @@ public final class BootReceiver extends BroadcastReceiver {
 
         try {
             HotkeyRepository repository = HotkeyRepository.getInstance(appContext);
-            if (!repository.isOnboardingCompleted() || !repository.isAutoSwitchEnabled()) {
+            if (!repository.isOnboardingCompleted()) {
                 return;
             }
 
-            boolean canSwitch = InputMethodSwitcher.hasSecureSettingsPermission(appContext);
+            // Interactive recovery is independent from the auto-switch
+            // preference: only autonomous switches require the preference.
+            boolean canSwitch = repository.isAutoSwitchEnabled()
+                    && InputMethodSwitcher.hasSecureSettingsPermission(appContext);
             boolean canPrompt = PermissionHelper.canDrawOverlays(appContext);
             boolean canNotify = KeyboardNotification.canPost(appContext);
             if (!canSwitch && !canPrompt && !canNotify) {
                 return;
             }
 
-            HardwareInputService.startKeyboardMonitor(appContext);
+            boolean keyboardPresent = KeyboardPresenceMonitor
+                    .isPhysicalKeyboardAvailable(appContext);
 
-            if (!KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(appContext)) {
+            HardwareInputService.startKeyboardMonitor(appContext);
+            KeyboardWatchdogService.reconcile(appContext, keyboardPresent);
+
+            if (!keyboardPresent) {
                 return;
             }
 

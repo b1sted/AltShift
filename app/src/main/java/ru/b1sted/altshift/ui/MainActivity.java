@@ -39,6 +39,7 @@ import ru.b1sted.altshift.service.HardwareInputService;
 import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardNotification;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
+import ru.b1sted.altshift.service.KeyboardWatchdogService;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.util.PermissionHelper;
 
@@ -472,6 +473,25 @@ public final class MainActivity extends AppCompatActivity {
 
         if (enabled || canPrompt) {
             HardwareInputService.startKeyboardMonitor(this);
+        }
+
+        reconcileKeyboardWatchdog();
+    }
+
+    /**
+     * Watchdog conditions read input devices and input-method settings, so they
+     * are evaluated on the status worker instead of the main thread.
+     */
+    private void reconcileKeyboardWatchdog() {
+        Context appContext = getApplicationContext();
+        if (appContext == null) {
+            return;
+        }
+
+        try {
+            statusExecutor.execute(() -> KeyboardWatchdogService.reconcile(appContext));
+        } catch (RejectedExecutionException exception) {
+            Log.w(TAG, "Watchdog reconciliation rejected during teardown", exception);
         }
     }
 
