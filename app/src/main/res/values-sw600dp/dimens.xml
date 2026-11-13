@@ -2,4 +2,5 @@
 <resources>
     <dimen name="onboarding_content_side_margin">48dp</dimen>
     <dimen name="prompt_min_width">420dp</dimen>
+    <dimen name="status_badge_max_width">260dp</dimen>
 </resources>

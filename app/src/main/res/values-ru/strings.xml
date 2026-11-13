@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ime_subtype_label">Клавиатура AltShift</string>
+
+    <string name="onboarding_step_label">Шаг %1$d</string>
+    <string name="onboarding_step_continue">ПРОДОЛЖИТЬ</string>
+    <string name="onboarding_step_finish">ЗАВЕРШИТЬ</string>
+
+    <string name="onboarding_step_enable_title">Включите AltShift</string>
+    <string name="onboarding_step_enable_description">Включите клавиатуру AltShift в настройках системы, чтобы Android мог её использовать. Оставьте включённой и экранную клавиатуру — так вы всегда сможете печатать без физической.</string>
+    <string name="onboarding_step_enable_action">ВКЛЮЧИТЬ В НАСТРОЙКАХ</string>
+    <string name="onboarding_enable_soft_keyboard_action">ВКЛЮЧИТЬ ЭКРАННУЮ КЛАВИАТУРУ</string>
+    <string name="onboarding_step_enable_status_ok">AltShift включён.</string>
+    <string name="onboarding_step_enable_status_pending">AltShift ещё не включён.</string>
+    <string name="onboarding_step_enable_status_no_soft_keyboard">Другие клавиатуры не включены. Включите экранную клавиатуру, чтобы не остаться без ввода.</string>
+
+    <string name="onboarding_step_select_title">Выберите AltShift</string>
+    <string name="onboarding_step_select_description">Выберите AltShift в качестве активного способа ввода для физической клавиатуры.</string>
+    <string name="onboarding_step_select_action">ВЫБРАТЬ ALTSHIFT</string>
+    <string name="onboarding_step_select_status_ok">AltShift — активная клавиатура.</string>
+    <string name="onboarding_step_select_status_pending">AltShift включён, но не выбран.</string>
+    <string name="onboarding_step_select_status_blocked">Сначала включите AltShift на шаге 1.</string>
+    <string name="onboarding_step_select_status_no_soft_keyboard">Сначала включите экранную клавиатуру, чтобы печатать без физической.</string>
+
+    <string name="onboarding_step_permissions_title">Разрешения</string>
+    <string name="onboarding_step_permissions_description">Разрешите наложение поверх окон, уведомления и работу в фоне, чтобы AltShift мог переключать клавиатуры и запускать приложения по горячим клавишам.</string>
+    <string name="onboarding_step_permissions_action">РАЗРЕШИТЬ НАЛОЖЕНИЕ</string>
+    <string name="onboarding_overlay_title">Наложение поверх окон</string>
+    <string name="onboarding_overlay_granted">Разрешено</string>
+    <string name="onboarding_overlay_pending">Не разрешено</string>
+    <string name="onboarding_notifications_title">Уведомления</string>
+    <string name="onboarding_notifications_granted">Включены</string>
+    <string name="onboarding_notifications_pending">Выключены</string>
+    <string name="onboarding_notifications_action">РАЗРЕШИТЬ УВЕДОМЛЕНИЯ</string>
+    <string name="onboarding_finish_anyway">ВСЁ РАВНО ЗАВЕРШИТЬ</string>
+
+    <string name="onboarding_background_title">Работа в фоне</string>
+    <string name="onboarding_background_description">Не давайте AltShift засыпать после простоя и разрешите запуск после перезагрузки.</string>
+    <string name="onboarding_background_granted">✓ Без ограничений</string>
+    <string name="onboarding_background_restricted">Ограничено оптимизацией</string>
+    <string name="onboarding_background_action">РАЗРЕШИТЬ РАБОТУ В ФОНЕ</string>
+    <string name="onboarding_background_rationale">Android может усыплять AltShift при длительном простое, и после ночи без использования планшета горячие клавиши перестанут работать.\n\nНа некоторых прошивках производителей (например, Lenovo ZUI, Xiaomi HyperOS или ColorOS) также включите «Автозапуск» в настройках приложения, чтобы AltShift мог снова запуститься после перезагрузки.\n\nНа следующем экране подтвердите, что AltShift может всегда работать в фоне.</string>
+    <string name="onboarding_background_continue">ПРОДОЛЖИТЬ</string>
+    <string name="onboarding_background_cancel">Отмена</string>
+    <string name="onboarding_background_failed">Не удалось открыть настройки оптимизации батареи.</string>
+
+    <string name="status_badge_format">%1$s · %2$s</string>
+    <string name="status_keyboard_connected">Подключена</string>
+    <string name="status_keyboard_disconnected">Отключена</string>
+    <string name="status_ime_active">IME активен</string>
+    <string name="status_ime_inactive">IME неактивен</string>
+
+    <string name="theme_title">Тема</string>
+    <string name="theme_system">Как в системе</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_dark">Тёмная</string>
+
+    <string name="language_app_title">Язык приложения</string>
+    <string name="language_app_system">Как в системе</string>
+
+    <string name="auto_switch_title">Плавное переключение (необязательно)</string>
+    <string name="auto_switch_description">AltShift может сам переключать клавиатуры, как только физическая клавиатура подключается или отключается.</string>
+    <string name="auto_switch_status_active">Активно</string>
+    <string name="auto_switch_status_permission">Требуется разрешение</string>
+    <string name="auto_switch_status_off">Выключено</string>
+    <string name="auto_switch_hint_show">Как это сделать</string>
+    <string name="auto_switch_hint_hide">Скрыть инструкцию</string>
+    <string name="auto_switch_hint_description">Хотите, чтобы AltShift включался автоматически, как только вы подключите клавиатуру? Android защищает системные настройки клавиатуры, поэтому для этого нужно один раз выдать разрешение с компьютера через USB.</string>
+    <string name="adb_step_one_title">Шаг 1 · Подключитесь к компьютеру</string>
+    <string name="adb_step_one_body">Подключите устройство к компьютеру (ПК или Mac) с помощью кабеля USB.</string>
+    <string name="adb_step_two_title">Шаг 2 · Включите отладку по USB</string>
+    <string name="adb_step_two_body">Включите отладку по USB в меню «Для разработчиков».</string>
+    <string name="adb_developer_options_action">Для разработчиков</string>
+    <string name="adb_step_three_title">Шаг 3 · Выполните команду</string>
+    <string name="adb_step_three_body">Выполните эту команду в терминале компьютера:</string>
+    <string name="adb_copy_command_action">Копировать команду</string>
+    <string name="adb_no_computer_notice">Нет компьютера? Не страшно! Без этого разрешения AltShift работает как обычно и при подключении клавиатуры просто покажет удобную подсказку с кнопкой переключения.</string>
+    <string name="auto_switch_command_label">Команда ADB для AltShift</string>
+    <string name="auto_switch_permission_required">Выдайте WRITE_SECURE_SETTINGS через ADB, чтобы включить автопереключение.</string>
+    <string name="command_copied">Команда скопирована в буфер обмена.</string>
+
+    <string name="notification_channel_name">Оповещения о подключении клавиатуры</string>
+    <string name="notification_channel_description">Оповещения при подключении физической клавиатуры или приостановке AltShift</string>
+    <string name="notification_urgent_channel_name">Требуется переключение клавиатуры</string>
+    <string name="notification_urgent_channel_description">Напоминание, если выбор клавиатуры закрыт без повторного включения AltShift</string>
+    <string name="notification_inactive_title">AltShift неактивен</string>
+    <string name="notification_inactive_text">Физическая клавиатура подключена, но выбрана другая экранная клавиатура. Горячие клавиши и транслитерация приостановлены.</string>
+    <string name="notification_switch_back">Переключить</string>
+    <string name="notification_warning_channel_name">Предупреждения о безопасности ввода</string>
+    <string name="notification_warning_channel_description">Оповещения, если в настройках системы не включена ни одна экранная клавиатура</string>
+    <string name="notification_no_keyboard_title">Нет доступной экранной клавиатуры</string>
+    <string name="notification_no_keyboard_text">AltShift — единственная включённая клавиатура. Включите в настройках экранную клавиатуру, чтобы печатать без физической.</string>
+    <string name="notification_keyboard_settings">Настройки клавиатуры</string>
+    <string name="notification_watchdog_channel_name">Монитор переподключения клавиатуры</string>
+    <string name="notification_watchdog_channel_description">Тихий статус, пока AltShift отслеживает подключение клавиатуры и ждёт повторной активации</string>
+    <string name="notification_watchdog_title">Ожидание физической клавиатуры</string>
+    <string name="notification_watchdog_text">Подключите физическую клавиатуру, чтобы вернуться к AltShift. Монитор остановится, как только клавиатура подключится.</string>
+    <string name="notification_watchdog_monitoring_title">Отслеживание подключения клавиатуры</string>
+    <string name="notification_watchdog_monitoring_text">AltShift остаётся готовым, пока выбрана другая клавиатура.</string>
+    <string name="prompt_keyboard_reconnected">Клавиатура подключена</string>
+    <string name="prompt_dismiss">Скрыть</string>
+
+    <string name="ime_fallback_message">Физическая клавиатура отключена. Переключитесь на экранную клавиатуру.</string>
+    <string name="ime_fallback_action">Сменить клавиатуру</string>
+    <string name="ime_fallback_no_keyboard_message">Экранная клавиатура не включена. Включите виртуальную клавиатуру в настройках, чтобы печатать с экрана.</string>
+    <string name="ime_fallback_settings_action">Открыть настройки клавиатуры</string>
+
+    <string name="language_section_title">Переключение раскладки</string>
+    <string name="language_shortcut_label">Сочетание</string>
+    <string name="change">Изменить</string>
+
+    <string name="app_hotkeys_section_title">Горячие клавиши приложений</string>
+    <string name="no_hotkeys">Ярлыки приложений ещё не настроены.</string>
+    <string name="add_hotkey">Добавить ярлык приложения</string>
+    <string name="delete_hotkey">Удалить ярлык</string>
+    <string name="delete_hotkey_for">Удалить ярлык для %1$s</string>
+    <string name="app_icon">Значок приложения</string>
+
+    <string name="capture_key_title">Захват сочетания клавиш</string>
+    <string name="capture_key_instruction">Нажмите физическое сочетание клавиш, которое хотите использовать.</string>
+    <string name="capture_key_hint">Удерживайте Ctrl, Alt или Meta вместе с клавишей-триггером, затем нажмите «Сохранить».</string>
+    <string name="capture_key_none">Клавиши не захвачены</string>
+    <string name="save">Сохранить</string>
+
+    <string name="select_app_title">Выбор приложения</string>
+    <string name="no_launchable_apps">Запускаемые приложения не найдены.</string>
+    <string name="app_picker_failed">Не удалось загрузить установленные приложения.</string>
+    <string name="app_picker_retry">Повторить</string>
+
+    <string name="shortcut_saved">Ярлык сохранён.</string>
+    <string name="shortcut_deleted">Ярлык удалён.</string>
+    <string name="shortcut_save_failed">Не удалось сохранить ярлык.</string>
+    <string name="shortcut_conflict_hotkey">Это сочетание уже назначено ярлыку приложения. Сначала удалите или измените его.</string>
+    <string name="shortcut_conflict_language">Это сочетание уже используется для переключения раскладки. Выберите другое.</string>
+    <string name="settings_open_failed">Не удалось открыть настройки клавиатуры.</string>
+    <string name="overlay_settings_failed">Не удалось открыть настройки наложения.</string>
+    <string name="ime_picker_failed">Не удалось открыть выбор клавиатуры.</string>
+
+    <string name="about_title">Об AltShift</string>
+    <string name="about_icon">Значок AltShift</string>
+    <string name="about_license">GNU General Public License v3.0</string>
+    <string name="about_author">Автор: Никита Мандрыкин (b1sted)</string>
+    <string name="about_repository_action">Репозиторий GitHub</string>
+    <string name="about_rerun_wizard_action">Запустить мастер настройки</string>
+    <string name="about_repository_failed">Не удалось открыть репозиторий GitHub.</string>
+    <string name="about_wizard_failed">Не удалось запустить мастер настройки.</string>
+
+    <string name="about_diagnostics_title">Диагностика оборудования</string>
+    <string name="about_keyboard_label">Физическая клавиатура</string>
+    <string name="about_hardware_ids_label">Идентификаторы оборудования</string>
+    <string name="about_active_ime_label">Активный IME</string>
+    <string name="about_auto_switch_label">Режим автопереключения</string>
+    <string name="about_keyboard_none">Не подключена</string>
+    <string name="about_hardware_ids_unknown">Н/Д</string>
+    <string name="about_auto_switch_autonomous">Автономное (WRITE_SECURE_SETTINGS)</string>
+    <string name="about_auto_switch_interactive">Интерактивное (Dynamic Island)</string>
+    <string name="about_value_loading">Чтение…</string>
+    <string name="about_value_unknown">Неизвестно</string>
+    <string name="about_value_unavailable">Недоступно</string>
+    <string name="about_close">Закрыть</string>
+</resources>

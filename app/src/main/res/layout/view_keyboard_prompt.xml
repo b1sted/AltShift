@@ -61,6 +61,7 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
+                android:maxLines="1"
                 android:minHeight="40dp"
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
