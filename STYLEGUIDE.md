@@ -205,6 +205,14 @@ static final class KeyCaptureState {
 *   Keep `app:tint` in the XML for AppCompat hosts, but also resolve `colorOnSurfaceVariant` and call `setImageTintList()` in the overlay after inflation. The plain themed `LayoutInflater` used outside an AppCompat activity ignores `app:tint`, which would leave the white vector source invisible on the light capsule. Do not switch to `android:tint`; Lint's `UseAppTint` rule rejects it.
 *   Keep `Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL`, account for the outer padding in the bottom offset (`max(0, inset - 20dp)` with a `28dp` bottom padding leaves the visible card `8dp` above the system inset), and let phones use the inset width while `sw600dp+` gives the card an exact `420dp` width. Keep `promptText` at `0dp` width with `layout_weight="1"`, `maxLines="1"`, and `ellipsize="end"` on every screen size so the message absorbs the remaining space and the action and close buttons stay pinned to the right `12dp` edge.
 
+### 5.5. Localization & Per-App Language
+*   Keep every user-facing string in `res/values/strings.xml` and its translated counterpart in `res/values-ru/strings.xml`. Mark invariant values such as the product name, the IME label, ADB commands, and diagnostic format strings with `translatable="false"` instead of duplicating them.
+*   The in-app language choice is owned by `LocaleController` and persisted through `AppCompatDelegate.setApplicationLocales()` with the `autoStoreLocales` metadata holder service. Declare the supported languages in `res/xml/locales_config.xml` and reference it from `android:localeConfig` so Android 13+ System App Language Settings stays in sync with the in-app selector.
+*   Activities inherit the per-app locale from AppCompat automatically. Components outside the AppCompat activity lifecycle (the Dynamic Island overlay, notifications, services, and receivers) must resolve `LocaleController.localizedContext(context)` before inflating views or reading strings. On API 33+ the method returns the original context because the platform applies app locales application-wide; on API 26–32 it clones the `Configuration` with the stored `LocaleList`.
+*   Combine localization with the theme resolution from Section 5.4: resolve the localized context first, then apply the persisted `ThemeMode` night-mode override to that context. Never inflate the Dynamic Island from a plain application context.
+*   After a locale change, call `LocaleController.refreshLocalizedNotifications()` so cached notification channel names and the running watchdog notification use the new language before the next process start.
+*   Russian labels are noticeably longer than English. Let primary actions wrap or grow instead of fixing their height, cap badge widths with dimens, keep the toolbar title visible at `360dp`, and keep single-line capsule actions from stealing the message width.
+
 ---
 
 ## 6. Modern Java 21 Language Idioms
@@ -369,3 +377,4 @@ Before committing any Java file, verify each checkpoint:
 - [ ] **Fail-Safe IME:** Are all `startActivity` and `InputConnection` interactions wrapped in defensive exception guards?
 - [ ] **Watchdog Scope:** Does `KeyboardWatchdogService` run only while AltShift is inactive with a usable reconnect/alert path, stop immediately once AltShift becomes the active IME, and update its notification only when the keyboard state changes?
 - [ ] **Guarded FGS Starts:** Are all `startForegroundService` and `startForeground` calls wrapped against `ForegroundServiceStartNotAllowedException` / `SecurityException` / `RuntimeException`?
+- [ ] **Localized Non-Activity Contexts:** Do the overlay, notifications, services, and receivers resolve `LocaleController.localizedContext()` and the persisted `ThemeMode` before inflating or reading strings?
