@@ -10,6 +10,7 @@ import android.provider.Settings;
 import android.util.Log;
 
 import ru.b1sted.altshift.R;
+import ru.b1sted.altshift.ui.LocaleController;
 import ru.b1sted.altshift.util.PermissionHelper;
 
 /**
@@ -54,13 +55,14 @@ public final class KeyboardWarningNotification {
                 return false;
             }
 
+            Context localized = LocaleController.localizedContext(context);
             PendingIntent pendingIntent = createSettingsIntent(context);
             Notification.Builder builder =
-                    new Notification.Builder(context, NotificationChannels.SAFETY_WARNINGS);
+                    new Notification.Builder(localized, NotificationChannels.SAFETY_WARNINGS);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
-                    .setContentTitle(context.getString(
+                    .setContentTitle(localized.getString(
                             R.string.notification_no_keyboard_title))
-                    .setContentText(context.getString(
+                    .setContentText(localized.getString(
                             R.string.notification_no_keyboard_text))
                     .setContentIntent(pendingIntent)
                     .setOngoing(true)
@@ -70,8 +72,8 @@ public final class KeyboardWarningNotification {
                     .setPriority(Notification.PRIORITY_HIGH)
                     .setDefaults(Notification.DEFAULT_ALL)
                     .addAction(new Notification.Action.Builder(
-                            Icon.createWithResource(context, R.drawable.ic_notification_keyboard),
-                            context.getString(R.string.notification_keyboard_settings),
+                            Icon.createWithResource(localized, R.drawable.ic_notification_keyboard),
+                            localized.getString(R.string.notification_keyboard_settings),
                             pendingIntent).build());
 
             manager.notify(NOTIFICATION_ID, builder.build());

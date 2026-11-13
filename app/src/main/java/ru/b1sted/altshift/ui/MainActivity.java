@@ -32,6 +32,7 @@ import java.util.concurrent.RejectedExecutionException;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ActivityMainBinding;
+import ru.b1sted.altshift.model.AppLanguage;
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
 import ru.b1sted.altshift.model.ThemeMode;
@@ -90,6 +91,8 @@ public final class MainActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        LocaleController.refreshLocalizedNotifications(this);
+
         repository = Objects.requireNonNull(
                 HotkeyRepository.getInstance(this), "repository");
         if (!repository.isOnboardingCompleted()) {
@@ -119,6 +122,7 @@ public final class MainActivity extends AppCompatActivity {
                 view -> openDeveloperOptions());
         binding.aboutButton.setOnClickListener(view -> AboutDialog.show(this));
         binding.themeButton.setOnClickListener(view -> showThemeDialog());
+        binding.languageButton.setOnClickListener(view -> showLanguageDialog());
 
         registerImeObserver();
         refreshAll();
@@ -527,6 +531,35 @@ public final class MainActivity extends AppCompatActivity {
         }
 
         return R.string.theme_system;
+    }
+
+    private void showLanguageDialog() {
+        AppLanguage[] languages = AppLanguage.values();
+        String[] labels = new String[languages.length];
+
+        for (int index = 0; index < languages.length; index++) {
+            labels[index] = getString(languageLabelRes(languages[index]));
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.language_app_title)
+                .setSingleChoiceItems(
+                        labels,
+                        LocaleController.getSelected(this).ordinal(),
+                        (dialog, which) -> {
+                            LocaleController.applySelection(this, languages[which]);
+                            dialog.dismiss();
+                        })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private int languageLabelRes(AppLanguage language) {
+        return switch (language) {
+            case ENGLISH -> R.string.language_app_english;
+            case RUSSIAN -> R.string.language_app_russian;
+            default -> R.string.language_app_system;
+        };
     }
 
     private void refreshLanguageShortcut() {

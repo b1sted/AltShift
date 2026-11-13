@@ -16,6 +16,7 @@ import java.util.concurrent.RejectedExecutionException;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.storage.HotkeyRepository;
+import ru.b1sted.altshift.ui.LocaleController;
 import ru.b1sted.altshift.util.PermissionHelper;
 
 /**
@@ -124,6 +125,39 @@ public final class KeyboardWatchdogService extends Service {
             appContext.stopService(new Intent(appContext, KeyboardWatchdogService.class));
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to stop the keyboard watchdog service", exception);
+        }
+    }
+
+    /**
+     * Reposts the current watchdog notification so its text follows a language
+     * change. The call is a no-op while the service is not running.
+     */
+    public static void refreshNotificationIfRunning(Context context) {
+        if (context == null || !running) {
+            return;
+        }
+
+        Context appContext = context.getApplicationContext();
+        if (appContext == null) {
+            return;
+        }
+
+        try {
+            NotificationManager manager =
+                    appContext.getSystemService(NotificationManager.class);
+            if (manager == null) {
+                return;
+            }
+
+            Notification notification =
+                    buildNotification(appContext, postedKeyboardPresent);
+            if (notification == null) {
+                return;
+            }
+
+            manager.notify(NOTIFICATION_ID, notification);
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to refresh the keyboard watchdog notification", exception);
         }
     }
 
@@ -335,11 +369,12 @@ public final class KeyboardWatchdogService extends Service {
                 : R.string.notification_watchdog_text;
 
         try {
+            Context localized = LocaleController.localizedContext(context);
             Notification.Builder builder = new Notification.Builder(
-                    context, NotificationChannels.KEYBOARD_WATCHDOG);
+                    localized, NotificationChannels.KEYBOARD_WATCHDOG);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
-                    .setContentTitle(context.getString(title))
-                    .setContentText(context.getString(text))
+                    .setContentTitle(localized.getString(title))
+                    .setContentText(localized.getString(text))
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .setShowWhen(false)

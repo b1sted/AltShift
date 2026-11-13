@@ -13,6 +13,7 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
@@ -26,6 +27,7 @@ import ru.b1sted.altshift.databinding.ViewImeFallbackBinding;
 import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
 import ru.b1sted.altshift.storage.HotkeyRepository;
+import ru.b1sted.altshift.ui.LocaleController;
 import ru.b1sted.altshift.ui.SwitchBackActivity;
 
 public final class HardwareInputService extends InputMethodService {
@@ -90,7 +92,10 @@ public final class HardwareInputService extends InputMethodService {
 
     @Override
     public View onCreateInputView() {
-        fallbackBinding = ViewImeFallbackBinding.inflate(getLayoutInflater());
+        Context localized = LocaleController.localizedContext(this);
+        LayoutInflater inflater = getLayoutInflater().cloneInContext(localized);
+
+        fallbackBinding = ViewImeFallbackBinding.inflate(inflater);
         fallbackBinding.switchKeyboardButton.setOnClickListener(
                 view -> requestSoftKeyboardSwitch());
         fallbackBinding.openKeyboardSettingsButton.setOnClickListener(

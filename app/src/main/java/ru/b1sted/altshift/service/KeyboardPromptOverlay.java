@@ -27,6 +27,7 @@ import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ViewKeyboardPromptBinding;
 import ru.b1sted.altshift.model.ThemeMode;
 import ru.b1sted.altshift.storage.HotkeyRepository;
+import ru.b1sted.altshift.ui.LocaleController;
 import ru.b1sted.altshift.util.PermissionHelper;
 
 /**
@@ -181,24 +182,25 @@ public final class KeyboardPromptOverlay {
     }
 
     /**
-     * The overlay lives outside any Activity, so the persisted theme must be
-     * applied to the inflation context explicitly. The application context on
-     * its own follows only the OS night mode and would ignore an in-app
-     * Light/Dark choice.
+     * The overlay lives outside any Activity, so both the persisted theme and
+     * the selected per-app language must be applied to the inflation context
+     * explicitly. The application context on its own follows only the OS night
+     * mode and locale, ignoring the in-app choices.
      */
     private Context themedContext() {
+        Context localized = LocaleController.localizedContext(context);
         ThemeMode mode = HotkeyRepository.getInstance(context).getThemeMode();
         if (mode == ThemeMode.FOLLOW_SYSTEM) {
-            return new ContextThemeWrapper(context, R.style.Theme_AltShift);
+            return new ContextThemeWrapper(localized, R.style.Theme_AltShift);
         }
 
         Configuration configuration = new Configuration(
-                context.getResources().getConfiguration());
+                localized.getResources().getConfiguration());
         configuration.uiMode = (configuration.uiMode & ~Configuration.UI_MODE_NIGHT_MASK)
                 | nightMode(mode);
 
         return new ContextThemeWrapper(
-                context.createConfigurationContext(configuration),
+                localized.createConfigurationContext(configuration),
                 R.style.Theme_AltShift);
     }
 

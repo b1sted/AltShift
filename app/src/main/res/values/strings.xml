@@ -57,6 +57,11 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
 
+    <string name="language_app_title">App language</string>
+    <string name="language_app_system">System default</string>
+    <string name="language_app_english" translatable="false">English</string>
+    <string name="language_app_russian" translatable="false">Русский</string>
+
     <string name="auto_switch_title">Seamless Hardware Switching (Optional)</string>
     <string name="auto_switch_description">AltShift can switch keyboards for you the moment your keyboard connects or disconnects.</string>
     <string name="auto_switch_status_active">Active</string>
