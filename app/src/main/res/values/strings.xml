@@ -92,9 +92,11 @@
     <string name="notification_no_keyboard_text">AltShift is the only enabled keyboard. Enable a virtual keyboard in settings so you can type without a physical keyboard.</string>
     <string name="notification_keyboard_settings">Keyboard Settings</string>
     <string name="notification_watchdog_channel_name">Keyboard Reconnect Monitor</string>
-    <string name="notification_watchdog_channel_description">Silent status shown only while AltShift waits for a physical keyboard to reconnect</string>
+    <string name="notification_watchdog_channel_description">Silent status shown while AltShift monitors the keyboard connection and waits to become active again</string>
     <string name="notification_watchdog_title">Waiting for physical keyboard</string>
     <string name="notification_watchdog_text">Connect a hardware keyboard to resume AltShift. The monitor stops as soon as a keyboard is attached.</string>
+    <string name="notification_watchdog_monitoring_title">Monitoring keyboard connection</string>
+    <string name="notification_watchdog_monitoring_text">AltShift stays ready while another keyboard is selected.</string>
     <string name="prompt_keyboard_reconnected">Keyboard reconnected</string>
     <string name="prompt_dismiss">Dismiss</string>
 

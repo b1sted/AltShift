@@ -128,9 +128,10 @@ public final class BootReceiver extends BroadcastReceiver {
                     .isPhysicalKeyboardAvailable(appContext);
 
             HardwareInputService.startKeyboardMonitor(appContext);
-            KeyboardWatchdogService.reconcile(appContext, keyboardPresent);
 
             if (!keyboardPresent) {
+                KeyboardWatchdogService.reconcile(appContext, false);
+
                 return;
             }
 
@@ -141,10 +142,13 @@ public final class BootReceiver extends BroadcastReceiver {
                     Log.w(TAG, "Unable to restore AltShift after " + action);
                 }
 
+                KeyboardWatchdogService.reconcile(appContext, true);
+
                 return;
             }
 
             showReconnectPromptIfNeeded(appContext);
+            KeyboardWatchdogService.reconcile(appContext, true);
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to reconcile the keyboard state after " + action, exception);
         }

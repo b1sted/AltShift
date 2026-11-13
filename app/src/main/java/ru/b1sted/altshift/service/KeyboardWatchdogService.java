@@ -1,6 +1,7 @@
 package ru.b1sted.altshift.service;
 
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -18,22 +19,25 @@ import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.util.PermissionHelper;
 
 /**
- * Keeps the process unfrozen while AltShift waits for a detached physical
- * keyboard to reconnect.
+ * Keeps the process unfrozen while AltShift waits for a physical keyboard or
+ * for the user to return to AltShift from another input method.
  *
  * <p>Android 12+ freezes cached applications once the input method service is
  * unbound. A frozen process receives no {@code InputDeviceListener} callbacks,
  * so a pogo-pin or Bluetooth keyboard could reconnect without AltShift noticing.
  * This foreground service holds the process in the cached-but-active state
- * only for the duration of that wait.</p>
+ * until AltShift becomes the active input method again.</p>
  */
 public final class KeyboardWatchdogService extends Service {
 
     private static final String TAG = "AltShift";
     private static final int NOTIFICATION_ID = 3001;
     private static final String WORKER_THREAD_NAME = "AltShift-Watchdog";
+    private static final String EXTRA_KEYBOARD_PRESENT = "keyboard_present";
+    private static final String EXTRA_HANDOFF = "handoff";
 
     private static volatile boolean running;
+    private static volatile boolean postedKeyboardPresent;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, WORKER_THREAD_NAME);
@@ -43,11 +47,11 @@ public final class KeyboardWatchdogService extends Service {
     });
 
     /**
-     * Starts the watchdog. The call is idempotent while the service is alive and
-     * is always guarded against background-start restrictions.
+     * Starts the watchdog and resolves the current keyboard state for the
+     * status notification. The call is idempotent while the service is alive.
      */
     public static void start(Context context) {
-        if (context == null || running) {
+        if (context == null) {
             return;
         }
 
@@ -56,16 +60,25 @@ public final class KeyboardWatchdogService extends Service {
             return;
         }
 
-        try {
-            appContext.startForegroundService(new Intent(
-                    appContext, KeyboardWatchdogService.class));
-        } catch (SecurityException exception) {
-            Log.w(TAG, "Unable to start the keyboard watchdog service", exception);
-        } catch (RuntimeException exception) {
-            // On API 31+ the platform may throw
-            // ForegroundServiceStartNotAllowedException, a RuntimeException.
-            Log.w(TAG, "Background foreground-service start was denied", exception);
+        start(appContext, KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(appContext));
+    }
+
+    /**
+     * Starts the watchdog with an already resolved keyboard state. While the
+     * service is already running the posted notification is refreshed only when
+     * the keyboard state actually changed.
+     */
+    public static void start(Context context, boolean keyboardPresent) {
+        if (context == null) {
+            return;
         }
+
+        Context appContext = context.getApplicationContext();
+        if (appContext == null) {
+            return;
+        }
+
+        startInternal(appContext, keyboardPresent, false);
     }
 
     /**
@@ -85,13 +98,16 @@ public final class KeyboardWatchdogService extends Service {
             return;
         }
 
-        if (!canMonitorWhileDetached(appContext)) {
+        if (!isMonitoringAvailable(appContext)) {
             stop(appContext);
 
             return;
         }
 
-        start(appContext);
+        boolean keyboardPresent = KeyboardPresenceMonitor
+                .isPhysicalKeyboardAvailable(appContext);
+
+        startInternal(appContext, keyboardPresent, true);
     }
 
     public static void stop(Context context) {
@@ -128,7 +144,8 @@ public final class KeyboardWatchdogService extends Service {
 
     /**
      * Applies the current monitoring conditions with an already resolved
-     * keyboard state to avoid a duplicate device scan.
+     * keyboard state to avoid a duplicate device scan. The keyboard state only
+     * selects the notification text; it never disables monitoring.
      */
     public static void reconcile(Context context, boolean keyboardPresent) {
         if (context == null) {
@@ -140,21 +157,24 @@ public final class KeyboardWatchdogService extends Service {
             return;
         }
 
-        if (keyboardPresent || !isMonitoringRequired(appContext, false)) {
+        if (!isMonitoringRequired(appContext, keyboardPresent)) {
             stop(appContext);
 
             return;
         }
 
-        start(appContext);
+        start(appContext, keyboardPresent);
     }
 
     /**
-     * Returns true only while AltShift is enabled but inactive, the physical
-     * keyboard is detached, and at least one reconnect path is usable.
+     * Returns true while AltShift is enabled but inactive and at least one
+     * reconnect or alert path is usable. The physical keyboard may be attached
+     * or detached; the process must stay unfrozen in both states so it can
+     * cancel stale alerts on disconnect and show the Dynamic Island again on
+     * reconnect.
      */
     public static boolean isMonitoringRequired(Context context, boolean keyboardPresent) {
-        if (context == null || keyboardPresent) {
+        if (context == null) {
             return false;
         }
 
@@ -168,26 +188,16 @@ public final class KeyboardWatchdogService extends Service {
             return false;
         }
 
-        return canMonitorWhileDetached(context, keyboardPresent);
+        return isMonitoringAvailable(context);
     }
 
     /**
-     * Checks every precondition except the active IME. This is used during the
-     * hand-off, while AltShift is still bound and therefore still active.
+     * Checks the hard preconditions: onboarding is complete, AltShift is
+     * enabled, and at least one automatic switch, overlay, or notification path
+     * is usable. The active input method is checked separately.
      */
-    public static boolean canMonitorWhileDetached(Context context) {
+    public static boolean isMonitoringAvailable(Context context) {
         if (context == null) {
-            return false;
-        }
-
-        boolean keyboardPresent = KeyboardPresenceMonitor
-                .isPhysicalKeyboardAvailable(context);
-
-        return canMonitorWhileDetached(context, keyboardPresent);
-    }
-
-    private static boolean canMonitorWhileDetached(Context context, boolean keyboardPresent) {
-        if (context == null || keyboardPresent) {
             return false;
         }
 
@@ -201,12 +211,35 @@ public final class KeyboardWatchdogService extends Service {
             boolean automaticSwitch = repository.isAutoSwitchEnabled()
                     && InputMethodSwitcher.hasSecureSettingsPermission(context);
             boolean interactiveSwitch = PermissionHelper.canDrawOverlays(context);
+            boolean alertOnly = KeyboardNotification.canPost(context);
 
-            return automaticSwitch || interactiveSwitch;
+            return automaticSwitch || interactiveSwitch || alertOnly;
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to evaluate keyboard watchdog conditions", exception);
 
             return false;
+        }
+    }
+
+    private static void startInternal(
+            Context appContext, boolean keyboardPresent, boolean handoff) {
+        if (running) {
+            updateNotificationIfChanged(appContext, keyboardPresent);
+
+            return;
+        }
+
+        try {
+            Intent intent = new Intent(appContext, KeyboardWatchdogService.class);
+            intent.putExtra(EXTRA_KEYBOARD_PRESENT, keyboardPresent);
+            intent.putExtra(EXTRA_HANDOFF, handoff);
+            appContext.startForegroundService(intent);
+        } catch (SecurityException exception) {
+            Log.w(TAG, "Unable to start the keyboard watchdog service", exception);
+        } catch (RuntimeException exception) {
+            // On API 31+ the platform may throw
+            // ForegroundServiceStartNotAllowedException, a RuntimeException.
+            Log.w(TAG, "Background foreground-service start was denied", exception);
         }
     }
 
@@ -222,14 +255,19 @@ public final class KeyboardWatchdogService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
 
-        Notification notification = buildNotification();
+        boolean keyboardPresent = resolveKeyboardPresent(intent);
+        Notification notification = buildNotification(this, keyboardPresent);
         if (notification == null || !promoteToForeground(notification)) {
             stopSelf();
 
             return START_NOT_STICKY;
         }
 
-        scheduleConditionCheck();
+        postedKeyboardPresent = keyboardPresent;
+
+        if (intent == null || !intent.getBooleanExtra(EXTRA_HANDOFF, false)) {
+            scheduleConditionCheck();
+        }
 
         return START_NOT_STICKY;
     }
@@ -237,6 +275,7 @@ public final class KeyboardWatchdogService extends Service {
     @Override
     public void onDestroy() {
         running = false;
+        postedKeyboardPresent = false;
         worker.shutdownNow();
 
         try {
@@ -253,13 +292,54 @@ public final class KeyboardWatchdogService extends Service {
         return null;
     }
 
-    private Notification buildNotification() {
+    private boolean resolveKeyboardPresent(Intent intent) {
+        if (intent != null && intent.hasExtra(EXTRA_KEYBOARD_PRESENT)) {
+            return intent.getBooleanExtra(EXTRA_KEYBOARD_PRESENT, false);
+        }
+
+        return KeyboardPresenceMonitor.isPhysicalKeyboardAvailable(this);
+    }
+
+    private static void updateNotificationIfChanged(
+            Context appContext, boolean keyboardPresent) {
+        if (postedKeyboardPresent == keyboardPresent) {
+            return;
+        }
+
+        try {
+            NotificationManager manager =
+                    appContext.getSystemService(NotificationManager.class);
+            if (manager == null) {
+                return;
+            }
+
+            Notification notification = buildNotification(appContext, keyboardPresent);
+            if (notification == null) {
+                return;
+            }
+
+            manager.notify(NOTIFICATION_ID, notification);
+            postedKeyboardPresent = keyboardPresent;
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to update the keyboard watchdog notification", exception);
+        }
+    }
+
+    private static Notification buildNotification(
+            Context context, boolean keyboardPresent) {
+        int title = keyboardPresent
+                ? R.string.notification_watchdog_monitoring_title
+                : R.string.notification_watchdog_title;
+        int text = keyboardPresent
+                ? R.string.notification_watchdog_monitoring_text
+                : R.string.notification_watchdog_text;
+
         try {
             Notification.Builder builder = new Notification.Builder(
-                    this, NotificationChannels.KEYBOARD_WATCHDOG);
+                    context, NotificationChannels.KEYBOARD_WATCHDOG);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
-                    .setContentTitle(getString(R.string.notification_watchdog_title))
-                    .setContentText(getString(R.string.notification_watchdog_text))
+                    .setContentTitle(context.getString(title))
+                    .setContentText(context.getString(text))
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .setShowWhen(false)
@@ -308,7 +388,7 @@ public final class KeyboardWatchdogService extends Service {
     }
 
     private void stopIfNotRequired() {
-        if (canMonitorWhileDetached(this)) {
+        if (isMonitoringRequired(this, false)) {
             return;
         }
 

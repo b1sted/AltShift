@@ -622,10 +622,6 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         private void applyKeyboardAttached() {
-            // The process is bound to a live IME again, so the watchdog is no
-            // longer needed and must not leave a foreground notification behind.
-            KeyboardWatchdogService.stop(appContext);
-
             // A stylus handwriting session holds the input connection, so it must
             // be released before AltShift can take over the physical keyboard.
             HardwareInputService service = serviceRef.get();
@@ -636,16 +632,25 @@ public final class HardwareInputService extends InputMethodService {
 
             if (isAutoSwitchPreferenceEnabled()
                     && InputMethodSwitcher.switchToAltShift(appContext)) {
+                KeyboardWatchdogService.stop(appContext);
+                KeyboardNotification.cancel(appContext);
                 KeyboardPromptOverlay.dismissActive();
 
                 return;
             }
 
             if (InputMethodSwitcher.isAltShiftActive(appContext)) {
+                KeyboardWatchdogService.stop(appContext);
+                KeyboardNotification.cancel(appContext);
                 KeyboardPromptOverlay.dismissActive();
 
                 return;
             }
+
+            // The user stays on another IME. Keep the watchdog alive so this
+            // process still observes the next disconnect and can show the
+            // Dynamic Island again after a reconnect.
+            KeyboardWatchdogService.reconcile(appContext, true);
 
             KeyboardNotification.cancel(appContext);
             mainHandler.post(this::showReconnectPrompt);
@@ -653,6 +658,7 @@ public final class HardwareInputService extends InputMethodService {
 
         private void applyKeyboardDetached(boolean alternative) {
             KeyboardPromptOverlay.dismissActive();
+            KeyboardNotification.cancel(appContext);
 
             if (autoSwitchSuppressed) {
                 ensureWatchdog();
@@ -691,7 +697,7 @@ public final class HardwareInputService extends InputMethodService {
         }
 
         private void ensureWatchdog() {
-            KeyboardWatchdogService.reconcile(appContext, keyboardPresent);
+            KeyboardWatchdogService.reconcile(appContext, false);
         }
 
         /**
