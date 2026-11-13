@@ -62,30 +62,31 @@ While it waits, the watchdog shows a silent `IMPORTANCE_MIN` "Waiting for physic
 - **Full Russian PC layout emulation (ЙЦУКЕН)**: Complete letter, punctuation, and number-row mapping (`1..0`, `-`, `=`) with strict CapsLock isolation. CapsLock affects only alphabetic keys and never inverts digits or symbols.
 - **Configurable language switch**: The default `Alt + Shift` combination toggles Russian transliteration and is captured from the next physical key combination in the settings UI. The OS subtype switcher is bypassed.
 - **Global app shortcuts**: Bind any hardware key combination to an installed application. Shortcuts are dispatched directly through the launcher intent and consume only the combinations the user defines. App hotkeys and the language switch cannot be assigned the same combination.
-- **Responsive Dynamic Island**: A floating capsule with a one-tap action that opens the direct system IME picker. On phones it takes the available inset width and ellipsizes the message so the action button stays on-screen; on tablets and large screens (600dp+) it keeps the 420dp capsule.
+- **Responsive Dynamic Island**: A floating Material 3 capsule with a subtle 1dp outline and an unclipped elevation shadow, plus a one-tap action that opens the direct system IME picker. On phones it takes the available inset width and ellipsizes the message so the action button stays on-screen; on tablets and large screens (600dp+) it keeps the 420dp capsule.
 - **Dual-mode keyboard switching**: AltShift returns natively to the on-screen keyboard when the hardware keyboard is detached, and can additionally switch autonomously on attach and detach when `WRITE_SECURE_SETTINGS` is granted.
 - **Standby reconnect watchdog**: A temporary `specialUse` foreground service keeps the process unfrozen while a detached keyboard may reconnect, then stops immediately once a keyboard is attached and leaves no notification or idle overhead behind. See [Standby Reconnect Watchdog](#standby-reconnect-watchdog).
 - **Unlock-resilient wake-up**: The receiver validates `BOOT_COMPLETED` and `USER_PRESENT`, wakes the process on screen unlock, restores AltShift immediately when a physical keyboard is attached, and reconciles the reconnect watchdog so background freezing cannot leave hardware input disconnected.
-- **Heads-Up alert banners**: The `altshift_keyboard_alerts` and `altshift_safety_warnings` channels surface keyboard and safety events as heads-up notifications. Smart deferred timing shows the inactive-keyboard alert only after the user makes a picker choice, so ignored prompts produce no spam; the alert is now dismissible with a swipe.
+- **Standard status alerts**: The `altshift_keyboard_alerts_v2` channel posts a swipe-dismissible, non-heads-up reminder when the user closes or ignores the Dynamic Island while AltShift remains inactive. Tapping **Switch back** opens the picker without an immediate notification; only a cancelled picker posts the reminder. Safety lockout warnings stay on the separate `altshift_safety_warnings` channel.
 - **Single-IME safety protection**: A dedicated warning fires when AltShift is the only enabled keyboard, preventing a lockout after the hardware keyboard is removed.
 - **Fail-safe service**: External intents, input connection calls, and secure-setting writes are guarded; an IME exception must never take down system input.
 - **100% universal AOSP architecture**: Public-API-only implementation with zero vendor lock-in. The same build runs on Lenovo, Samsung, Xiaomi, Google Pixel, and other Android 8.0+ devices without OEM-specific branches.
 - **Material 3 dashboard**: Toolbar status badge, language shortcut card, auto-switch controls, hotkey list, key-capture dialog, and application picker, with Light, Dark, and System themes applied application-wide.
 - **Fullscreen onboarding**: A three-step wizard with large iconography, step indicator dots, permission verification, and one-tap actions for IME enablement, selection, notifications, and overlay access. IME state is resolved on a background worker so the first frame stays responsive.
 - **About dialog with live diagnostics**: Version details, keyboard name, VID/PID, active IME, and switch mode, plus a repository link and a setup-wizard rerun action.
-- **Zero-waste resource policy**: Pure Java 21, under 25 MB RAM, 0.0% CPU while idle, and zero telemetry. No network permission, no persistent background daemon, and no all-packages visibility: the temporary reconnect watchdog is the only foreground service and stops as soon as a keyboard is attached. App labels are resolved off the main thread and icons are decoded lazily per bound row, so the settings UI peak memory is lower. Configuration stays in local `SharedPreferences`.
+- **Zero-waste resource policy**: Pure Java 21, ~2 MB Java heap (~10 MB Java + native heap while typing), 0.0% CPU while idle, and zero telemetry. No network permission, no persistent background daemon, and no all-packages visibility: the temporary reconnect watchdog is the only foreground service and stops as soon as a keyboard is attached. App labels are resolved off the main thread and icons are decoded lazily per bound row, so the settings UI peak memory is lower. Configuration stays in local `SharedPreferences`.
 
 ## Resource Footprint & Verification
 
-AltShift operates strictly on an event-driven model with zero background polling loops, wake locks, or telemetry services. The reconnect watchdog is a single foreground-service state, not a polling loop, and it is absent while a keyboard is attached. Real-world resource footprint verified on physical hardware via `dumpsys meminfo` (measured on an unstripped debug build):
+AltShift operates strictly on an event-driven model with zero background polling loops, wake locks, or telemetry services. The reconnect watchdog is a single standby `specialUse` foreground-service state, not a polling loop, and it is stopped immediately while a physical keyboard is attached. Real-world resource footprint verified on a Lenovo TB710FU (Android 16, 2000×3200, 400 dpi) via `dumpsys meminfo` and `top` (measured on an unstripped debug build):
 
-| Metric | Active IME (Typing Mode) | Active UI Settings (Peak) | Notes |
-| :--- | :--- | :--- | :--- |
-| **Dalvik (Java) Heap** | **~2.0 MB** (`2001 KB`) | ~4.7 MB | Microscopic Java code & transliteration footprint |
-| **Native Heap** | **~7.2 MB** (`7243 KB`) | ~52 MB | Transient icon/view allocations only during active UI; v0.4.4 defers icon decode to bound rows |
-| **Bitmaps / Graphics** | **0 KB** (0 bitmaps) | ~152 MB EGL | Reclaimed on UI exit; the lazy icon cache is bounded to 32–48 entries |
-| **Idle CPU** | **0.0%** | < 1.0% | Core sleeps until physical key-switch contact closes; no watchdog timer runs while attached |
-| **Network / Sockets** | **0 bytes** (No `INTERNET` perm) | 0 bytes | Hardware input is physically isolated from network |
+| Metric | Active IME (Typing Mode) | Standby Watchdog (Detached) | Active UI + App Picker (Peak) | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Java heap alloc** | **~2.0 MB** (`2041 KB`) | **~3.6 MB** (`3629 KB`) | **~5.1 MB** (`5153 KB`) | `Dalvik Heap` allocation; microscopic Java code and transliteration footprint |
+| **Native heap alloc** | **~7.2 MB** (`7382 KB`) | **~9.0 MB** (`9171 KB`) | **~49.6 MB** (`50832 KB`) | Transient view and icon allocations; v0.4.4 defers app-picker icon decoding to bound rows |
+| **Total PSS** | **~40.8 MB** (`41773 KB`) | **~51.4 MB** (`52601 KB`) | **~352 MB** (`360592 KB`) | Full process footprint, including shared code and platform overhead |
+| **Bitmaps / Graphics (PSS)** | **0 KB** | **0 KB** | **~16.7 MB bitmaps** (`16735 KB`) / **~226.8 MB Graphics** (`226756 KB`) | Bitmap allocations and EGL surface memory are reclaimed on UI exit; the lazy icon cache is bounded to 32–48 entries |
+| **Idle CPU** | **0.0%** | **0.0%** | **0.0–1.0%** | `top -b -n 3 -d 1` while the UI is idle; no watchdog timer runs and the process sleeps between callbacks |
+| **Network / Sockets** | **0 bytes** (`INTERNET` not declared) | **0 bytes** | **0 bytes** | Hardware input is physically isolated from the network |
 
 ### Permissions & Package Visibility
 
@@ -104,7 +105,10 @@ AltShift declares no `INTERNET` permission and does not request `QUERY_ALL_PACKA
 adb shell dumpsys meminfo ru.b1sted.altshift
 
 # Verify zero idle CPU consumption
-adb shell top -m 5 -d 1 | grep ru.b1sted.altshift
+adb shell top -b -n 1 | grep ru.b1sted.altshift
+
+# Cross-check the cumulative process CPU time
+adb shell dumpsys cpuinfo | grep altshift
 
 # Confirm absence of network permissions
 adb shell dumpsys package ru.b1sted.altshift | grep "permission.INTERNET"
