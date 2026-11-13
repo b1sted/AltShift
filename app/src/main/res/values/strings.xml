@@ -37,11 +37,11 @@
     <string name="onboarding_finish_anyway">FINISH ANYWAY</string>
 
     <string name="onboarding_background_title">Background execution</string>
-    <string name="onboarding_background_description">Keep AltShift awake after long idle periods.</string>
+    <string name="onboarding_background_description">Keep AltShift awake after idle periods and allow it to restart after a reboot.</string>
     <string name="onboarding_background_granted">✓ Unrestricted</string>
     <string name="onboarding_background_restricted">Optimized/restricted</string>
     <string name="onboarding_background_action">ALLOW BACKGROUND RUNNING</string>
-    <string name="onboarding_background_rationale">Android may put AltShift to sleep during long idle periods, which disables hotkeys after the tablet has been unused overnight.\n\nThe next screen asks you to confirm that AltShift can always run in the background.</string>
+    <string name="onboarding_background_rationale">Android may put AltShift to sleep during long idle periods, which disables hotkeys after the tablet has been unused overnight.\n\nOn some manufacturer ROMs (for example Lenovo ZUI, Xiaomi HyperOS, or ColorOS), also enable Auto-start in the system app settings so AltShift can start again after a reboot.\n\nThe next screen asks you to confirm that AltShift can always run in the background.</string>
     <string name="onboarding_background_continue">CONTINUE</string>
     <string name="onboarding_background_cancel">Cancel</string>
     <string name="onboarding_background_failed">Unable to open battery optimization settings.</string>
