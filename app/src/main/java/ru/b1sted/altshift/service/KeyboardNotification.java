@@ -66,7 +66,7 @@ public final class KeyboardNotification {
                     .setContentText(context.getString(
                             R.string.notification_inactive_text))
                     .setContentIntent(pendingIntent)
-                    .setOngoing(true)
+                    .setAutoCancel(true)
                     .setOnlyAlertOnce(true)
                     .setShowWhen(false)
                     .setCategory(Notification.CATEGORY_STATUS)
