@@ -199,9 +199,11 @@ static final class KeyCaptureState {
 *   In `RecyclerView.ViewHolder`, bind views directly through generated binding references without `findViewById` traversal.
 
 ### 5.4. Dynamic Island Overlay Conventions
-*   A floating `WindowManager` overlay must use a transparent outer `FrameLayout` with at least `16dp` padding, `android:clipToPadding="false"`, and `android:clipChildren="false"`.
-*   Put elevation and the subtle `1dp` `?attr/colorOutline` stroke on the inner `MaterialCardView` (`28dp` radius, `?attr/colorSurface`), never on the `WRAP_CONTENT` window root, so the shadow is never clipped into a rectangle.
-*   Keep `Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL`, account for the outer padding in the bottom offset, and let phones use the inset width while `sw600dp+` keeps the `420dp` minimum.
+*   Resolve the persisted `ThemeMode` before inflating. For `LIGHT` and `DARK`, clone the resources `Configuration`, set `UI_MODE_NIGHT_NO` or `UI_MODE_NIGHT_YES`, and wrap the result with `ContextThemeWrapper(..., R.style.Theme_AltShift)`. A plain application context follows only the OS night mode and would ignore an in-app theme choice.
+*   Use a transparent outer `FrameLayout` with asymmetric padding (`24dp` start/end, `14dp` top, `28dp` bottom or more), `android:clipToPadding="false"`, and `android:clipChildren="false"` so the shadow never touches the `WindowManager` window bounds.
+*   Put elevation (`4dp`) and the subtle `1dp` `@color/prompt_stroke` hairline on the inner `MaterialCardView` (`28dp` radius, `@color/prompt_surface`), never on the `WRAP_CONTENT` window root. Keep `prompt_surface` and `prompt_stroke` as dedicated Light/Dark tokens; do not reuse `?attr/colorSurface` plus `?attr/colorOutline`, which produces a flat black card with a harsh wireframe outline.
+*   Keep `app:tint` in the XML for AppCompat hosts, but also resolve `colorOnSurfaceVariant` and call `setImageTintList()` in the overlay after inflation. The plain themed `LayoutInflater` used outside an AppCompat activity ignores `app:tint`, which would leave the white vector source invisible on the light capsule. Do not switch to `android:tint`; Lint's `UseAppTint` rule rejects it.
+*   Keep `Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL`, account for the outer padding in the bottom offset (`max(0, inset - 20dp)` with a `28dp` bottom padding leaves the visible card `8dp` above the system inset), and let phones use the inset width while `sw600dp+` keeps the `420dp` minimum.
 
 ---
 
@@ -341,10 +343,11 @@ try {
 ```
 
 ### 8.5. Inactive-Keyboard Notification Convention
-*   The `KeyboardNotification` reminder uses the versioned `altshift_keyboard_alerts_v2` channel at `IMPORTANCE_DEFAULT`: it appears in the shade but never as a heads-up banner.
-*   Do not set `Notification.PRIORITY_HIGH` or `Notification.DEFAULT_ALL`; keep the reminder swipe-dismissible with `setAutoCancel(true)` and no `setOngoing(true)`.
-*   Post it only after the user closes or times out the Dynamic Island, or cancels the system picker. An explicit **Switch back** action and every programmatic dismissal must not post it.
-*   Cancel it when AltShift becomes the active IME or the physical keyboard detaches, so the reminder never outlives the condition it describes.
+*   `KeyboardNotification` owns two channels and one shared notification ID (`1001`), so at most one inactive reminder exists at a time.
+*   **Standard reminder:** `KeyboardNotification.showInactive()` uses `altshift_keyboard_alerts_v2` (`NotificationChannels.KEYBOARD_ALERTS`, `IMPORTANCE_DEFAULT`). It appears in the shade with a status-bar icon, never as a heads-up banner. Do not set `Notification.PRIORITY_HIGH` or `Notification.DEFAULT_ALL`; keep it swipe-dismissible with `setAutoCancel(true)`, `setOnlyAlertOnce(true)`, and no `setOngoing(true)`.
+*   **Heads-up reminder:** `KeyboardNotification.showInactiveHeadsUp()` uses `altshift_keyboard_alerts_urgent` (`NotificationChannels.KEYBOARD_ALERTS_URGENT`, `IMPORTANCE_HIGH`, vibration enabled) with `Notification.PRIORITY_HIGH` and `Notification.DEFAULT_ALL`. Omit `setOnlyAlertOnce(true)` so a repeated picker cancellation reliably pops up again. Keep it swipe-dismissible with `setAutoCancel(true)` and no `setOngoing(true)`.
+*   Post the standard reminder only after the user closes (`[X]`) or times out (12 s) the Dynamic Island, from `BootReceiver` and `HardwareInputService`. Post the heads-up reminder only from `SwitchBackActivity.onPickerDismissed()` when `!InputMethodSwitcher.isAltShiftActive()`. An explicit **Switch back** action and every programmatic dismissal must not post the standard reminder.
+*   Cancel the shared notification when AltShift becomes the active IME or the physical keyboard detaches, so no reminder outlives the condition it describes.
 
 ---
 
