@@ -12,9 +12,11 @@ import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
+import android.widget.LinearLayout;
 
 import androidx.annotation.RequiresApi;
 
@@ -30,6 +32,8 @@ public final class KeyboardPromptOverlay {
     private static final String TAG = "AltShift";
     private static final long AUTO_DISMISS_MS = 12000L;
     private static final int FALLBACK_BOTTOM_PADDING_DP = 16;
+    private static final int PROMPT_HORIZONTAL_MARGIN_DP = 16;
+    private static final int TABLET_MIN_WIDTH_DP = 600;
     private static final Object LOCK = new Object();
 
     @SuppressLint("StaticFieldLeak")
@@ -71,7 +75,7 @@ public final class KeyboardPromptOverlay {
         synchronized (LOCK) {
             KeyboardPromptOverlay current = active;
             if (current != null && current.shown) {
-                current.onSwitch = onSwitch;
+                current.refreshAutoDismiss(onSwitch);
 
                 return true;
             }
@@ -82,16 +86,26 @@ public final class KeyboardPromptOverlay {
             return false;
         }
 
+        KeyboardPromptOverlay previous;
         synchronized (LOCK) {
-            KeyboardPromptOverlay previous = active;
+            previous = active;
             active = overlay;
+        }
 
-            if (previous != null && previous != overlay) {
-                previous.dismiss();
-            }
+        if (previous != null && previous != overlay) {
+            previous.dismiss();
         }
 
         return true;
+    }
+
+    private void refreshAutoDismiss(Runnable switchAction) {
+        synchronized (LOCK) {
+            onSwitch = switchAction;
+        }
+
+        handler.removeCallbacks(dismissRunnable);
+        handler.postDelayed(dismissRunnable, AUTO_DISMISS_MS);
     }
 
     public static void dismissActive() {
@@ -107,47 +121,70 @@ public final class KeyboardPromptOverlay {
     }
 
     private boolean showInternal(Runnable switchAction) {
-        synchronized (LOCK) {
-            if (shown) {
-                onSwitch = switchAction;
-
-                return true;
-            }
-
-            if (windowManager == null) {
-                return false;
-            }
-
-            try {
-                ContextThemeWrapper themedContext =
-                        new ContextThemeWrapper(context, R.style.Theme_AltShift);
-                ViewKeyboardPromptBinding inflated = ViewKeyboardPromptBinding.inflate(
-                        LayoutInflater.from(themedContext));
-
-                onSwitch = switchAction;
-                inflated.promptAction.setOnClickListener(view -> runSwitchAction());
-                inflated.promptClose.setOnClickListener(view -> dismiss());
-
-                binding = inflated;
-                windowManager.addView(inflated.getRoot(), createParams());
-
-                shown = true;
-                handler.postDelayed(dismissRunnable, AUTO_DISMISS_MS);
-                Log.d(TAG, "Keyboard prompt overlay shown");
-
-                return true;
-            } catch (RuntimeException exception) {
-                Log.w(TAG, "Unable to show the keyboard prompt overlay", exception);
-                ViewKeyboardPromptBinding failed = binding;
-                binding = null;
-                onSwitch = null;
-                shown = false;
-
-                removeFailedView(failed);
-
-                return false;
-            }
+        if (windowManager == null) {
+            return false;
         }
+
+        ViewKeyboardPromptBinding inflated;
+        try {
+            ContextThemeWrapper themedContext =
+                    new ContextThemeWrapper(context, R.style.Theme_AltShift);
+            inflated = ViewKeyboardPromptBinding.inflate(
+                    LayoutInflater.from(themedContext));
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to inflate the keyboard prompt overlay", exception);
+
+            return false;
+        }
+
+        releaseTextWeightOnTablets(inflated);
+        inflated.promptAction.setOnClickListener(view -> runSwitchAction());
+        inflated.promptClose.setOnClickListener(view -> dismiss());
+
+        try {
+            windowManager.addView(inflated.getRoot(), createParams());
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to show the keyboard prompt overlay", exception);
+            removeFailedView(inflated);
+
+            return false;
+        }
+
+        synchronized (LOCK) {
+            onSwitch = switchAction;
+            binding = inflated;
+            shown = true;
+        }
+
+        handler.postDelayed(dismissRunnable, AUTO_DISMISS_MS);
+        Log.d(TAG, "Keyboard prompt overlay shown");
+
+        return true;
+    }
+
+    /**
+     * The phone layout lets the message take the remaining width and ellipsize.
+     * A tablet capsule keeps its 420dp minimum and lets the message wrap to its
+     * natural size instead of stretching the pill across the whole screen.
+     */
+    private void releaseTextWeightOnTablets(ViewKeyboardPromptBinding inflated) {
+        if (isCompactWidth()) {
+            return;
+        }
+
+        ViewGroup.LayoutParams params = inflated.promptText.getLayoutParams();
+        if (!(params instanceof LinearLayout.LayoutParams textParams)) {
+            return;
+        }
+
+        textParams.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+        textParams.weight = 0f;
+        inflated.promptText.setLayoutParams(textParams);
+    }
+
+    private boolean isCompactWidth() {
+        return context.getResources().getConfiguration().smallestScreenWidthDp
+                < TABLET_MIN_WIDTH_DP;
     }
 
     private void runSwitchAction() {
@@ -237,7 +274,7 @@ public final class KeyboardPromptOverlay {
 
     private WindowManager.LayoutParams createParams() {
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
+                promptWidth(),
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
@@ -249,6 +286,24 @@ public final class KeyboardPromptOverlay {
         params.windowAnimations = R.style.Animation_AltShift_Prompt;
 
         return params;
+    }
+
+    /**
+     * Phones get an explicit inset width so the message can shrink and
+     * ellipsize instead of pushing the action button off-screen. Tablets keep
+     * the natural capsule width controlled by the 420dp minimum.
+     */
+    private int promptWidth() {
+        if (!isCompactWidth()) {
+            return WindowManager.LayoutParams.WRAP_CONTENT;
+        }
+
+        int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
+        int availableWidth = screenWidth - dp(PROMPT_HORIZONTAL_MARGIN_DP) * 2;
+
+        return availableWidth > 0
+                ? availableWidth
+                : WindowManager.LayoutParams.WRAP_CONTENT;
     }
 
     private int bottomInset() {

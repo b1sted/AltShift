@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:minWidth="420dp"
+    android:minWidth="@dimen/prompt_min_width"
     android:background="@drawable/bg_prompt_pill"
     android:elevation="8dp"
     android:gravity="center_vertical"
@@ -23,11 +23,12 @@
 
     <TextView
         android:id="@+id/promptText"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
         android:maxLines="1"
-        android:minWidth="180dp"
         android:text="@string/prompt_keyboard_reconnected"
         android:textAppearance="?attr/textAppearanceTitleSmall"
         android:textColor="?attr/colorOnSurface" />
