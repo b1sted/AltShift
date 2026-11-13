@@ -51,6 +51,24 @@ public final class ModelTest {
         assertFalse(shortcut.matches(KeyEvent.KEYCODE_ALT_LEFT, false, true, false, false));
     }
 
+    @Test
+    public void appHotkeyConflictsWithMatchingLanguageShortcut() {
+        HotkeyBinding binding = new HotkeyBinding(
+                KeyEvent.KEYCODE_SHIFT_RIGHT, false, true, true, false,
+                "com.example", "Example");
+
+        assertTrue(binding.conflictsWith(LanguageSwitchShortcut.DEFAULT));
+    }
+
+    @Test
+    public void appHotkeyDoesNotConflictWithAnotherLanguageShortcut() {
+        HotkeyBinding binding = new HotkeyBinding(
+                KeyEvent.KEYCODE_A, true, false, false, false,
+                "com.example", "Example");
+
+        assertFalse(binding.conflictsWith(LanguageSwitchShortcut.DEFAULT));
+    }
+
     @Test(expected = NullPointerException.class)
     public void hotkeyRejectsNullPackageName() {
         new HotkeyBinding(KeyEvent.KEYCODE_A, false, false, false, false, null, "Example");

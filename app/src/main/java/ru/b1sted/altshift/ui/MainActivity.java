@@ -546,8 +546,16 @@ public final class MainActivity extends AppCompatActivity {
     private void saveLanguageShortcut(
             int keyCode, boolean ctrl, boolean alt, boolean shift, boolean meta) {
         try {
-            repository.saveLanguageShortcut(new LanguageSwitchShortcut(
-                    keyCode, ctrl, alt, shift, meta));
+            LanguageSwitchShortcut candidate = new LanguageSwitchShortcut(
+                    keyCode, ctrl, alt, shift, meta);
+
+            if (hasAppHotkeyConflict(candidate)) {
+                toast(R.string.shortcut_conflict_hotkey);
+
+                return;
+            }
+
+            repository.saveLanguageShortcut(candidate);
             refreshLanguageShortcut();
             toast(R.string.shortcut_saved);
         } catch (RuntimeException exception) {
@@ -556,14 +564,40 @@ public final class MainActivity extends AppCompatActivity {
         }
     }
 
+    private boolean hasAppHotkeyConflict(LanguageSwitchShortcut shortcut) {
+        for (HotkeyBinding binding : repository.getBindings()) {
+            if (binding.conflictsWith(shortcut)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void addHotkey() {
         KeyCaptureDialog.show(this, null, this::showAppPicker, true);
     }
 
     private void showAppPicker(
             int keyCode, boolean ctrl, boolean alt, boolean shift, boolean meta) {
+        if (conflictsWithLanguageShortcut(keyCode, ctrl, alt, shift, meta)) {
+            toast(R.string.shortcut_conflict_language);
+
+            return;
+        }
+
         AppPickerDialog.show(this, (appName, packageName) ->
                 saveHotkey(keyCode, ctrl, alt, shift, meta, appName, packageName));
+    }
+
+    private boolean conflictsWithLanguageShortcut(
+            int keyCode, boolean ctrl, boolean alt, boolean shift, boolean meta) {
+        LanguageSwitchShortcut shortcut = repository.getLanguageShortcut();
+        if (shortcut == null) {
+            return false;
+        }
+
+        return shortcut.matches(keyCode, ctrl, alt, shift, meta);
     }
 
     private void saveHotkey(
@@ -574,6 +608,12 @@ public final class MainActivity extends AppCompatActivity {
             boolean meta,
             String appName,
             String packageName) {
+        if (conflictsWithLanguageShortcut(keyCode, ctrl, alt, shift, meta)) {
+            toast(R.string.shortcut_conflict_language);
+
+            return;
+        }
+
         try {
             repository.saveBinding(new HotkeyBinding(
                     keyCode,

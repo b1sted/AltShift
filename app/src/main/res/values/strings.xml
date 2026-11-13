@@ -126,6 +126,8 @@
     <string name="shortcut_saved">Shortcut saved.</string>
     <string name="shortcut_deleted">Shortcut deleted.</string>
     <string name="shortcut_save_failed">Unable to save shortcut.</string>
+    <string name="shortcut_conflict_hotkey">This combination is already assigned to an app shortcut. Delete or change that shortcut first.</string>
+    <string name="shortcut_conflict_language">This combination is already used for the language switch. Choose a different combination.</string>
     <string name="settings_open_failed">Unable to open keyboard settings.</string>
     <string name="overlay_settings_failed">Unable to open overlay settings.</string>
     <string name="ime_picker_failed">Unable to open the keyboard picker.</string>
