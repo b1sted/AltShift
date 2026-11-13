@@ -13,6 +13,7 @@ import ru.b1sted.altshift.R;
 public final class NotificationChannels {
 
     public static final String KEYBOARD_ALERTS = "altshift_keyboard_alerts_v2";
+    public static final String KEYBOARD_ALERTS_URGENT = "altshift_keyboard_alerts_urgent";
     public static final String SAFETY_WARNINGS = "altshift_safety_warnings";
     public static final String KEYBOARD_WATCHDOG = "altshift_keyboard_watchdog";
 
@@ -43,6 +44,7 @@ public final class NotificationChannels {
 
             deleteLegacy(manager);
             ensureKeyboardAlerts(context, manager);
+            ensureKeyboardAlertsUrgent(context, manager);
             ensureSafetyWarnings(context, manager);
             ensureKeyboardWatchdog(context, manager);
         } catch (RuntimeException exception) {
@@ -67,6 +69,23 @@ public final class NotificationChannels {
                 NotificationManager.IMPORTANCE_DEFAULT);
         channel.setDescription(context.getString(
                 R.string.notification_channel_description));
+        channel.enableVibration(true);
+
+        manager.createNotificationChannel(channel);
+    }
+
+    private static void ensureKeyboardAlertsUrgent(
+            Context context, NotificationManager manager) {
+        if (manager.getNotificationChannel(KEYBOARD_ALERTS_URGENT) != null) {
+            return;
+        }
+
+        NotificationChannel channel = new NotificationChannel(
+                KEYBOARD_ALERTS_URGENT,
+                context.getString(R.string.notification_urgent_channel_name),
+                NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription(context.getString(
+                R.string.notification_urgent_channel_description));
         channel.enableVibration(true);
 
         manager.createNotificationChannel(channel);

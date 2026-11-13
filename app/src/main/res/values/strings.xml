@@ -81,6 +81,8 @@
 
     <string name="notification_channel_name">Keyboard Connection Alerts</string>
     <string name="notification_channel_description">Alerts when a physical keyboard connects or when AltShift is paused</string>
+    <string name="notification_urgent_channel_name">Keyboard Switch Required</string>
+    <string name="notification_urgent_channel_description">Heads-up reminder when the keyboard picker closes without reactivating AltShift</string>
     <string name="notification_inactive_title">AltShift is inactive</string>
     <string name="notification_inactive_text">Physical keyboard connected, but another on-screen keyboard is selected. Hotkeys and transliteration are paused.</string>
     <string name="notification_switch_back">Switch back</string>

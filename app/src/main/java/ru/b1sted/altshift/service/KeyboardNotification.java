@@ -25,6 +25,19 @@ public final class KeyboardNotification {
     }
 
     public static void showInactive(Context context) {
+        post(context, NotificationChannels.KEYBOARD_ALERTS, false);
+    }
+
+    /**
+     * Heads-up variant used when the user opens the picker and cancels it
+     * without reactivating AltShift, so the failed attempt is immediately
+     * visible instead of waiting in the shade.
+     */
+    public static void showInactiveHeadsUp(Context context) {
+        post(context, NotificationChannels.KEYBOARD_ALERTS_URGENT, true);
+    }
+
+    private static void post(Context context, String channelId, boolean headsUp) {
         if (context == null) {
             return;
         }
@@ -59,7 +72,7 @@ public final class KeyboardNotification {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
             Notification.Builder builder =
-                    new Notification.Builder(context, NotificationChannels.KEYBOARD_ALERTS);
+                    new Notification.Builder(context, channelId);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
                     .setContentTitle(context.getString(
                             R.string.notification_inactive_title))
@@ -67,13 +80,21 @@ public final class KeyboardNotification {
                             R.string.notification_inactive_text))
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true)
-                    .setOnlyAlertOnce(true)
                     .setShowWhen(false)
                     .setCategory(Notification.CATEGORY_STATUS)
                     .addAction(new Notification.Action.Builder(
                             Icon.createWithResource(context, R.drawable.ic_notification_keyboard),
                             context.getString(R.string.notification_switch_back),
                             pendingIntent).build());
+
+            if (headsUp) {
+                // No setOnlyAlertOnce(true): a repeated picker cancellation
+                // must pop up again, not stay silent because the ID is reused.
+                builder.setPriority(Notification.PRIORITY_HIGH)
+                        .setDefaults(Notification.DEFAULT_ALL);
+            } else {
+                builder.setOnlyAlertOnce(true);
+            }
 
             manager.notify(NOTIFICATION_ID, builder.build());
         } catch (RuntimeException exception) {
