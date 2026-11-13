@@ -22,6 +22,7 @@
 <p align="center">
     <a href="#overview">Overview</a> &bull;
     <a href="#features">Features</a> &bull;
+    <a href="#standby-reconnect-watchdog">Watchdog</a> &bull;
     <a href="#resource-footprint--verification">Resource Footprint</a> &bull;
     <a href="#requirements">Requirements</a> &bull;
     <a href="#building-from-cli">Building from CLI</a> &bull;
@@ -33,7 +34,7 @@
 
 <p align="center"><img src="docs/screenshots/gui.png" alt="AltShift Dashboard" width="760" /></p>
 
-A minimal, hardware-first input method service for Android that turns a physical keyboard into a first-class input device. No cloud services, no analytics, and no background daemons.
+A minimal, hardware-first input method service for Android that turns a physical keyboard into a first-class input device. No cloud services, no analytics, and no persistent background daemons.
 
 ## Overview
 
@@ -43,34 +44,59 @@ The driver is written in pure Java 21 with native XML views and Material 3 compo
 
 When a physical keyboard connects or disconnects, AltShift can switch input methods autonomously through `WRITE_SECURE_SETTINGS`, or fall back to a one-tap Dynamic Island prompt and the native system IME picker. Both paths are crash-guarded: an IME failure must never take down system input or trap the user without a usable keyboard.
 
+## Standby Reconnect Watchdog
+
+Android 12+ may freeze a cached app process after the platform unbinds AltShift's input method service. A frozen process receives no `InputManager.InputDeviceListener` callbacks, so a pogo-pin, dock, or Bluetooth keyboard could reconnect while AltShift is frozen and the device would stay on the soft keyboard with no automatic recovery.
+
+To cover that single gap, AltShift runs a temporary foreground service (`KeyboardWatchdogService`, `foregroundServiceType="specialUse"`) only while **all** of these are true:
+
+- onboarding is complete;
+- no physical keyboard is attached;
+- AltShift is enabled but is not the active input method;
+- at least one reconnect path is usable: autonomous switching with `WRITE_SECURE_SETTINGS`, or the Dynamic Island overlay permission.
+
+While it waits, the watchdog shows a silent `IMPORTANCE_MIN` "Waiting for physical keyboard" notification. It performs no polling and holds no wake lock: the foreground service simply keeps the process unfrozen so the existing input-device listener can receive the reconnect callback. As soon as a physical keyboard is attached, AltShift becomes the active IME, onboarding is reset, or the last reconnect path disappears, the service stops itself and removes the notification. While a keyboard is attached and the user is typing, no watchdog runs, so the event-driven typing path and its zero idle overhead are unchanged.
+
 ## Features
 
 - **Full Russian PC layout emulation (ЙЦУКЕН)**: Complete letter, punctuation, and number-row mapping (`1..0`, `-`, `=`) with strict CapsLock isolation. CapsLock affects only alphabetic keys and never inverts digits or symbols.
 - **Configurable language switch**: The default `Alt + Shift` combination toggles Russian transliteration and is captured from the next physical key combination in the settings UI. The OS subtype switcher is bypassed.
-- **Global app shortcuts**: Bind any hardware key combination to an installed application. Shortcuts are dispatched directly through the launcher intent and consume only the combinations the user defines.
-- **Tablet Dynamic Island**: A 420dp floating capsule with a one-tap action that opens the direct system IME picker, designed for tablets and large screens.
+- **Global app shortcuts**: Bind any hardware key combination to an installed application. Shortcuts are dispatched directly through the launcher intent and consume only the combinations the user defines. App hotkeys and the language switch cannot be assigned the same combination.
+- **Responsive Dynamic Island**: A floating capsule with a one-tap action that opens the direct system IME picker. On phones it takes the available inset width and ellipsizes the message so the action button stays on-screen; on tablets and large screens (600dp+) it keeps the 420dp capsule.
 - **Dual-mode keyboard switching**: AltShift returns natively to the on-screen keyboard when the hardware keyboard is detached, and can additionally switch autonomously on attach and detach when `WRITE_SECURE_SETTINGS` is granted.
-- **Unlock-resilient wake-up**: The receiver also handles `USER_PRESENT`, waking the process on screen unlock and restoring AltShift immediately when a physical keyboard is attached, so platform background freezing cannot leave hardware input disconnected.
-- **Heads-Up alert banners**: The `altshift_keyboard_alerts` and `altshift_safety_warnings` channels surface keyboard and safety events as heads-up notifications. Smart deferred timing shows the inactive-keyboard alert only after the user makes a picker choice, so ignored prompts produce no spam.
+- **Standby reconnect watchdog**: A temporary `specialUse` foreground service keeps the process unfrozen while a detached keyboard may reconnect, then stops immediately once a keyboard is attached and leaves no notification or idle overhead behind. See [Standby Reconnect Watchdog](#standby-reconnect-watchdog).
+- **Unlock-resilient wake-up**: The receiver validates `BOOT_COMPLETED` and `USER_PRESENT`, wakes the process on screen unlock, restores AltShift immediately when a physical keyboard is attached, and reconciles the reconnect watchdog so background freezing cannot leave hardware input disconnected.
+- **Heads-Up alert banners**: The `altshift_keyboard_alerts` and `altshift_safety_warnings` channels surface keyboard and safety events as heads-up notifications. Smart deferred timing shows the inactive-keyboard alert only after the user makes a picker choice, so ignored prompts produce no spam; the alert is now dismissible with a swipe.
 - **Single-IME safety protection**: A dedicated warning fires when AltShift is the only enabled keyboard, preventing a lockout after the hardware keyboard is removed.
 - **Fail-safe service**: External intents, input connection calls, and secure-setting writes are guarded; an IME exception must never take down system input.
 - **100% universal AOSP architecture**: Public-API-only implementation with zero vendor lock-in. The same build runs on Lenovo, Samsung, Xiaomi, Google Pixel, and other Android 8.0+ devices without OEM-specific branches.
 - **Material 3 dashboard**: Toolbar status badge, language shortcut card, auto-switch controls, hotkey list, key-capture dialog, and application picker, with Light, Dark, and System themes applied application-wide.
+- **Fullscreen onboarding**: A three-step wizard with large iconography, step indicator dots, permission verification, and one-tap actions for IME enablement, selection, notifications, and overlay access. IME state is resolved on a background worker so the first frame stays responsive.
 - **About dialog with live diagnostics**: Version details, keyboard name, VID/PID, active IME, and switch mode, plus a repository link and a setup-wizard rerun action.
-- **Fullscreen onboarding**: A three-step wizard with large iconography, step indicator dots, permission verification, and one-tap actions for IME enablement, selection, notifications, and overlay access.
-- **Zero-waste resource policy**: Pure Java 21, under 25 MB RAM, 0.0% CPU while idle, and zero telemetry. No network permissions and no background daemons; configuration stays in local `SharedPreferences`.
+- **Zero-waste resource policy**: Pure Java 21, under 25 MB RAM, 0.0% CPU while idle, and zero telemetry. No network permission, no persistent background daemon, and no all-packages visibility: the temporary reconnect watchdog is the only foreground service and stops as soon as a keyboard is attached. App labels are resolved off the main thread and icons are decoded lazily per bound row, so the settings UI peak memory is lower. Configuration stays in local `SharedPreferences`.
 
 ## Resource Footprint & Verification
 
-AltShift operates strictly on an event-driven model with zero background polling loops, wake locks, or telemetry services. Real-world resource footprint verified on physical hardware via `dumpsys meminfo` (measured on an unstripped debug build):
+AltShift operates strictly on an event-driven model with zero background polling loops, wake locks, or telemetry services. The reconnect watchdog is a single foreground-service state, not a polling loop, and it is absent while a keyboard is attached. Real-world resource footprint verified on physical hardware via `dumpsys meminfo` (measured on an unstripped debug build):
 
-| Metric | Background Daemon (Typing Mode) | Active UI Settings (Peak) | Notes |
+| Metric | Active IME (Typing Mode) | Active UI Settings (Peak) | Notes |
 | :--- | :--- | :--- | :--- |
 | **Dalvik (Java) Heap** | **~2.0 MB** (`2001 KB`) | ~4.7 MB | Microscopic Java code & transliteration footprint |
-| **Native Heap** | **~7.2 MB** (`7243 KB`) | ~52 MB | Transient icon/view allocations only during active UI |
-| **Bitmaps / Graphics** | **0 KB** (0 bitmaps) | ~152 MB EGL | 100% of 3K GPU buffers and icons are reclaimed on UI exit |
-| **Idle CPU** | **0.0%** | < 1.0% | Core sleeps until physical key-switch contact closes |
+| **Native Heap** | **~7.2 MB** (`7243 KB`) | ~52 MB | Transient icon/view allocations only during active UI; v0.4.4 defers icon decode to bound rows |
+| **Bitmaps / Graphics** | **0 KB** (0 bitmaps) | ~152 MB EGL | Reclaimed on UI exit; the lazy icon cache is bounded to 32–48 entries |
+| **Idle CPU** | **0.0%** | < 1.0% | Core sleeps until physical key-switch contact closes; no watchdog timer runs while attached |
 | **Network / Sockets** | **0 bytes** (No `INTERNET` perm) | 0 bytes | Hardware input is physically isolated from network |
+
+### Permissions & Package Visibility
+
+AltShift declares no `INTERNET` permission and does not request `QUERY_ALL_PACKAGES`. The app picker relies on a narrow `<queries>` declaration for the launcher intent, so it can list launchable applications without broad package visibility. The remaining permissions are:
+
+- `SYSTEM_ALERT_WINDOW` for the Dynamic Island overlay.
+- `POST_NOTIFICATIONS` for keyboard, safety, and watchdog status on Android 13+.
+- `WRITE_SECURE_SETTINGS` as an optional development grant for autonomous input-method switching.
+- `RECEIVE_BOOT_COMPLETED` for boot and unlock reconciliation.
+- `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE` for the temporary reconnect watchdog.
+- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` for the onboarding Doze exemption request.
 
 ### Reproduce Diagnostics via ADB
 ```bash
@@ -82,6 +108,9 @@ adb shell top -m 5 -d 1 | grep ru.b1sted.altshift
 
 # Confirm absence of network permissions
 adb shell dumpsys package ru.b1sted.altshift | grep "permission.INTERNET"
+
+# Confirm the watchdog is absent while a keyboard is attached (no output expected)
+adb shell dumpsys activity services ru.b1sted.altshift | grep KeyboardWatchdog
 ```
 
 ## Requirements
@@ -183,9 +212,11 @@ Open **AltShift** from the launcher.
 | Setting | Default | Description |
 | --- | --- | --- |
 | Language switch | `Alt + Shift` | Toggles Russian transliteration. Captured from the next physical combination. |
-| App hotkeys | Empty | Each binding maps a modifier mask and key code to an installed application. |
+| App hotkeys | Empty | Each binding maps a modifier mask and key code to an installed application. A combination already used by the language switch is rejected. |
 | Theme | System default | Light, Dark, or System theme, applied application-wide and persisted. |
 | Seamless auto-switching | On | Switches between AltShift and the soft keyboard when a hardware keyboard attaches or detaches. Requires `WRITE_SECURE_SETTINGS`. |
+
+The reconnect watchdog has no user setting. It is reconciled automatically from the keyboard state, the active IME, and the available reconnect paths; its silent status uses the `altshift_keyboard_watchdog` notification channel.
 
 The fullscreen onboarding wizard reports whether AltShift is enabled and selected, requests notification permission on Android 13+, provides a one-tap overlay permission action, and requests a battery optimization exemption so the service survives Doze mode. The dashboard shows a toolbar status badge, the language shortcut card, the auto-switch toggle, and the app hotkey list. App shortcuts are stored per package and can be removed from the list.
 
