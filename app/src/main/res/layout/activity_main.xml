@@ -95,7 +95,7 @@
                     android:layout_marginStart="6dp"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:maxWidth="@dimen/status_badge_max_width"
+                    android:maxWidth="@dimen/status_badge_text_max_width"
                     android:textAppearance="?attr/textAppearanceLabelSmall"
                     android:textColor="?attr/colorOnSurfaceVariant" />
 
