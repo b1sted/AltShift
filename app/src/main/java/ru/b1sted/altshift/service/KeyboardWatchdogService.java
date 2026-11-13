@@ -361,20 +361,23 @@ public final class KeyboardWatchdogService extends Service {
 
     private static Notification buildNotification(
             Context context, boolean keyboardPresent) {
-        int title = keyboardPresent
+        int titleRes = keyboardPresent
                 ? R.string.notification_watchdog_monitoring_title
                 : R.string.notification_watchdog_title;
-        int text = keyboardPresent
+        int textRes = keyboardPresent
                 ? R.string.notification_watchdog_monitoring_text
                 : R.string.notification_watchdog_text;
 
         try {
             Context localized = LocaleController.localizedContext(context);
+            String title = localized.getString(titleRes);
+            String body = localized.getString(textRes);
             Notification.Builder builder = new Notification.Builder(
                     localized, NotificationChannels.KEYBOARD_WATCHDOG);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
-                    .setContentTitle(localized.getString(title))
-                    .setContentText(localized.getString(text))
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setStyle(new Notification.BigTextStyle().bigText(body))
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .setShowWhen(false)

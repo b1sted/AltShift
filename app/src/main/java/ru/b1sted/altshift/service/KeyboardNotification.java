@@ -67,6 +67,8 @@ public final class KeyboardNotification {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
 
             Context localized = LocaleController.localizedContext(context);
+            String title = localized.getString(R.string.notification_inactive_title);
+            String body = localized.getString(R.string.notification_inactive_text);
             PendingIntent pendingIntent = PendingIntent.getActivity(
                     context,
                     REQUEST_CODE,
@@ -76,10 +78,9 @@ public final class KeyboardNotification {
             Notification.Builder builder =
                     new Notification.Builder(localized, channelId);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
-                    .setContentTitle(localized.getString(
-                            R.string.notification_inactive_title))
-                    .setContentText(localized.getString(
-                            R.string.notification_inactive_text))
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setStyle(new Notification.BigTextStyle().bigText(body))
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true)
                     .setShowWhen(false)

@@ -3,14 +3,12 @@ package ru.b1sted.altshift.service;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.ColorStateList;
-import android.content.res.Configuration;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,9 +23,7 @@ import com.google.android.material.color.MaterialColors;
 
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ViewKeyboardPromptBinding;
-import ru.b1sted.altshift.model.ThemeMode;
-import ru.b1sted.altshift.storage.HotkeyRepository;
-import ru.b1sted.altshift.ui.LocaleController;
+import ru.b1sted.altshift.ui.ThemeController;
 import ru.b1sted.altshift.util.PermissionHelper;
 
 /**
@@ -146,8 +142,10 @@ public final class KeyboardPromptOverlay {
 
         ViewKeyboardPromptBinding inflated;
         try {
+            // The overlay lives outside any Activity, so the shared helper
+            // applies both the per-app locale and the persisted night mode.
             inflated = ViewKeyboardPromptBinding.inflate(
-                    LayoutInflater.from(themedContext()));
+                    LayoutInflater.from(ThemeController.themedContext(context)));
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to inflate the keyboard prompt overlay", exception);
 
@@ -179,37 +177,6 @@ public final class KeyboardPromptOverlay {
         Log.d(TAG, "Keyboard prompt overlay shown");
 
         return true;
-    }
-
-    /**
-     * The overlay lives outside any Activity, so both the persisted theme and
-     * the selected per-app language must be applied to the inflation context
-     * explicitly. The application context on its own follows only the OS night
-     * mode and locale, ignoring the in-app choices.
-     */
-    private Context themedContext() {
-        Context localized = LocaleController.localizedContext(context);
-        ThemeMode mode = HotkeyRepository.getInstance(context).getThemeMode();
-        if (mode == ThemeMode.FOLLOW_SYSTEM) {
-            return new ContextThemeWrapper(localized, R.style.Theme_AltShift);
-        }
-
-        Configuration configuration = new Configuration(
-                localized.getResources().getConfiguration());
-        configuration.uiMode = (configuration.uiMode & ~Configuration.UI_MODE_NIGHT_MASK)
-                | nightMode(mode);
-
-        return new ContextThemeWrapper(
-                localized.createConfigurationContext(configuration),
-                R.style.Theme_AltShift);
-    }
-
-    private int nightMode(ThemeMode mode) {
-        return switch (mode) {
-            case LIGHT -> Configuration.UI_MODE_NIGHT_NO;
-            case DARK -> Configuration.UI_MODE_NIGHT_YES;
-            default -> Configuration.UI_MODE_NIGHT_UNDEFINED;
-        };
     }
 
     /**
