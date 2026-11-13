@@ -294,7 +294,50 @@ private boolean tryStartActivity(Intent intent) {
 
 ---
 
-## 8. Code Review Compliance Checklist
+## 8. Cached Apps Freezer & Watchdog Foreground Service Standard
+
+AltShift owns no `Activity` while the user types in another application. Once the platform unbinds `HardwareInputService`, `ru.b1sted.altshift` becomes a cached process. On Android 12+ the Cached Apps Freezer may then set `isFrozen=true` and `oom_adj=900` (`cch LAST`), even when battery optimization is disabled for the app.
+
+*   **Frozen processes miss input callbacks.** A frozen process receives no `InputManager.InputDeviceListener` Binder callbacks. A pogo-pin or external keyboard can reconnect while the process is frozen, leaving the device stuck on the soft keyboard with no way for AltShift to react.
+*   **The watchdog is a temporary thaw, not a permanent daemon.** `KeyboardWatchdogService` exists solely to keep the process unfrozen while a physical keyboard is detached and reconnect monitoring is active. It is not a background keep-alive for the whole application.
+
+### 8.1. When `KeyboardWatchdogService` May Run
+Start the watchdog only when **all** of the following are true:
+1. Onboarding is completed.
+2. No physical keyboard is currently attached.
+3. AltShift is enabled in the system IME settings but is **not** the active IME.
+4. At least one reconnect mechanism is usable: `autoSwitchEnabled` with `WRITE_SECURE_SETTINGS`, or the `SYSTEM_ALERT_WINDOW` overlay permission.
+
+### 8.2. Mandatory Shutdown Rules
+*   Call `stopSelf()` (or `KeyboardWatchdogService.stop()`) immediately when a physical keyboard is attached. **Zero foreground-service notifications may remain while a keyboard is attached.**
+*   Stop when AltShift becomes the active IME, because the live `InputMethodService` binding already keeps the process unfrozen.
+*   Stop when onboarding is reset, AltShift is disabled, or no reconnect mechanism remains available.
+*   Reconcile the watchdog from the existing process-wide monitor whenever the keyboard state or input-method settings change; never rely on a polling loop.
+
+### 8.3. Android 14 Foreground Service Declaration
+*   Declare `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE` in `AndroidManifest.xml`.
+*   Use `android:foregroundServiceType="specialUse"` with the `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE` property. Do **not** use `connectedDevice`: it requires Bluetooth, USB, or Wi-Fi permissions that AltShift intentionally avoids.
+*   On API 34+, call `startForeground(id, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)`; older releases use the two-argument overload.
+*   Use the `NotificationChannels.KEYBOARD_WATCHDOG` channel (`IMPORTANCE_MIN`, no vibration, no sound, no badge), keep the notification ongoing, and set `FOREGROUND_SERVICE_IMMEDIATE` on API 31+. Silence comes from the channel, so the framework `Notification.Builder` stays compatible with `minSdk 26`.
+
+### 8.4. Defensive Foreground-Service Starts
+Every `startForegroundService()` and `startForeground()` call must be wrapped in `try-catch`. The platform may reject a background start with `ForegroundServiceStartNotAllowedException` (API 31+, a `RuntimeException`) or with a `SecurityException` when the FGS type or permission is unavailable. Log the rejection and continue; a denied watchdog must never crash the IME or the boot receiver.
+
+```java
+// ✅ MANDATORY: Guarded background foreground-service start
+try {
+    appContext.startForegroundService(new Intent(appContext, KeyboardWatchdogService.class));
+} catch (SecurityException exception) {
+    Log.w(TAG, "Unable to start the keyboard watchdog service", exception);
+} catch (RuntimeException exception) {
+    // ForegroundServiceStartNotAllowedException on API 31+.
+    Log.w(TAG, "Background foreground-service start was denied", exception);
+}
+```
+
+---
+
+## 9. Code Review Compliance Checklist
 
 Before committing any Java file, verify each checkpoint:
 
@@ -307,3 +350,5 @@ Before committing any Java file, verify each checkpoint:
 - [ ] **No One-Element Arrays:** Are dialogs free of `int[]` and `boolean[]` closure workarounds?
 - [ ] **Async UI:** Are package queries and app icons loaded off the main thread?
 - [ ] **Fail-Safe IME:** Are all `startActivity` and `InputConnection` interactions wrapped in defensive exception guards?
+- [ ] **Watchdog Scope:** Does `KeyboardWatchdogService` stop immediately once a physical keyboard is attached, leaving no FGS notification behind?
+- [ ] **Guarded FGS Starts:** Are all `startForegroundService` and `startForeground` calls wrapped against `ForegroundServiceStartNotAllowedException` / `SecurityException` / `RuntimeException`?
