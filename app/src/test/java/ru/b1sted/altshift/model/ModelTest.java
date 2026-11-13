@@ -83,4 +83,96 @@ public final class ModelTest {
     public void languageShortcutRejectsUnknownKeyCode() {
         new LanguageSwitchShortcut(0, false, false, false, false);
     }
+
+    @Test
+    public void modifierKeyDetectionRejectsNonModifierKeys() {
+        assertTrue(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_SHIFT_LEFT));
+        assertTrue(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_SHIFT_RIGHT));
+        assertTrue(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_ALT_LEFT));
+        assertTrue(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_ALT_RIGHT));
+        assertTrue(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_CTRL_LEFT));
+        assertTrue(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_CTRL_RIGHT));
+        assertTrue(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_META_LEFT));
+        assertTrue(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_META_RIGHT));
+
+        assertFalse(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_A));
+        assertFalse(KeyMatcher.isModifierKey(KeyEvent.KEYCODE_SPACE));
+    }
+
+    @Test
+    public void modifierActivationIgnoresNonModifierKeyCodes() {
+        assertFalse(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_A, true, true, true, true));
+        assertFalse(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_SPACE, true, true, true, true));
+    }
+
+    @Test
+    public void modifierActivationTracksEachModifierFlag() {
+        assertTrue(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_CTRL_LEFT, true, false, false, false));
+        assertTrue(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_ALT_RIGHT, false, true, false, false));
+        assertTrue(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_SHIFT_RIGHT, false, false, true, false));
+        assertTrue(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_META_LEFT, false, false, false, true));
+
+        assertFalse(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_CTRL_LEFT, false, false, false, false));
+        assertFalse(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_ALT_RIGHT, false, false, false, false));
+        assertFalse(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_SHIFT_RIGHT, false, false, false, false));
+        assertFalse(KeyMatcher.isModifierActive(
+                KeyEvent.KEYCODE_META_LEFT, false, false, false, false));
+    }
+
+    @Test
+    public void modifierOnlyHotkeyRejectsDifferentModifierMask() {
+        HotkeyBinding binding = new HotkeyBinding(
+                KeyEvent.KEYCODE_SHIFT_LEFT, false, true, true, false,
+                "com.example", "Example");
+
+        assertFalse(binding.matches(
+                KeyEvent.KEYCODE_ALT_LEFT, false, true, false, false));
+    }
+
+    @Test
+    public void modifierBindingDoesNotMatchRegularKeyEvent() {
+        HotkeyBinding binding = new HotkeyBinding(
+                KeyEvent.KEYCODE_SHIFT_LEFT, false, true, true, false,
+                "com.example", "Example");
+
+        assertFalse(binding.matches(
+                KeyEvent.KEYCODE_A, false, true, true, false));
+    }
+
+    @Test
+    public void regularBindingDoesNotMatchModifierKeyEvent() {
+        HotkeyBinding binding = new HotkeyBinding(
+                KeyEvent.KEYCODE_A, false, true, true, false,
+                "com.example", "Example");
+
+        assertFalse(binding.matches(
+                KeyEvent.KEYCODE_ALT_LEFT, false, true, true, false));
+    }
+
+    @Test
+    public void languageShortcutConflictRequiresMatchingModifierMask() {
+        HotkeyBinding binding = new HotkeyBinding(
+                KeyEvent.KEYCODE_SHIFT_LEFT, false, true, false, false,
+                "com.example", "Example");
+
+        assertFalse(binding.conflictsWith(LanguageSwitchShortcut.DEFAULT));
+    }
+
+    @Test
+    public void languageShortcutConflictMatchesEquivalentModifierOrder() {
+        HotkeyBinding binding = new HotkeyBinding(
+                KeyEvent.KEYCODE_ALT_RIGHT, false, true, true, false,
+                "com.example", "Example");
+
+        assertTrue(binding.conflictsWith(LanguageSwitchShortcut.DEFAULT));
+    }
 }
