@@ -160,7 +160,7 @@ public final class HotkeyRepository {
         Objects.requireNonNull(binding, "binding");
 
         synchronized (lock) {
-            HotkeyBinding[] updated = upsertBinding(bindings, binding);
+            HotkeyBinding[] updated = HotkeyBindingStore.upsert(bindings, binding);
             if (updated == bindings) {
                 return;
             }
@@ -174,7 +174,7 @@ public final class HotkeyRepository {
         Objects.requireNonNull(binding, "binding");
 
         synchronized (lock) {
-            HotkeyBinding[] updated = removeBinding(bindings, binding);
+            HotkeyBinding[] updated = HotkeyBindingStore.remove(bindings, binding);
             if (updated == bindings) {
                 return;
             }
@@ -223,61 +223,6 @@ public final class HotkeyRepository {
 
             return fallback;
         }
-    }
-
-    private static HotkeyBinding[] upsertBinding(
-            HotkeyBinding[] current, HotkeyBinding binding) {
-        for (int index = 0; index < current.length; index++) {
-            if (current[index].matches(
-                    binding.keyCode(),
-                    binding.isCtrl(),
-                    binding.isAlt(),
-                    binding.isShift(),
-                    binding.isMeta())) {
-                if (current[index].equals(binding)) {
-                    return current;
-                }
-
-                HotkeyBinding[] updated = current.clone();
-                updated[index] = binding;
-
-                return updated;
-            }
-        }
-
-        HotkeyBinding[] updated = new HotkeyBinding[current.length + 1];
-        System.arraycopy(current, 0, updated, 0, current.length);
-        updated[current.length] = binding;
-
-        return updated;
-    }
-
-    private static HotkeyBinding[] removeBinding(
-            HotkeyBinding[] current, HotkeyBinding binding) {
-        int matchIndex = -1;
-
-        for (int index = 0; index < current.length; index++) {
-            if (current[index].matches(
-                    binding.keyCode(),
-                    binding.isCtrl(),
-                    binding.isAlt(),
-                    binding.isShift(),
-                    binding.isMeta())) {
-                matchIndex = index;
-                break;
-            }
-        }
-
-        if (matchIndex < 0) {
-            return current;
-        }
-
-        HotkeyBinding[] updated = new HotkeyBinding[current.length - 1];
-        System.arraycopy(current, 0, updated, 0, matchIndex);
-        System.arraycopy(current, matchIndex + 1, updated, matchIndex,
-                current.length - matchIndex - 1);
-
-        return updated;
     }
 
     private static String writeBindings(HotkeyBinding[] items) {

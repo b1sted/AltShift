@@ -40,6 +40,7 @@ import ru.b1sted.altshift.service.InputMethodSwitcher;
 import ru.b1sted.altshift.service.KeyboardNotification;
 import ru.b1sted.altshift.service.KeyboardPresenceMonitor;
 import ru.b1sted.altshift.service.KeyboardWatchdogService;
+import ru.b1sted.altshift.storage.HotkeyBindingStore;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.util.PermissionHelper;
 
@@ -517,12 +518,15 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private int themeLabelRes(ThemeMode mode) {
-        return switch (mode) {
-            case LIGHT -> R.string.theme_light;
-            case DARK -> R.string.theme_dark;
-            case FOLLOW_SYSTEM -> R.string.theme_system;
-            default -> R.string.theme_system;
-        };
+        if (mode == ThemeMode.DARK) {
+            return R.string.theme_dark;
+        }
+
+        if (mode == ThemeMode.LIGHT) {
+            return R.string.theme_light;
+        }
+
+        return R.string.theme_system;
     }
 
     private void refreshLanguageShortcut() {
@@ -565,13 +569,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private boolean hasAppHotkeyConflict(LanguageSwitchShortcut shortcut) {
-        for (HotkeyBinding binding : repository.getBindings()) {
-            if (binding.conflictsWith(shortcut)) {
-                return true;
-            }
-        }
-
-        return false;
+        return HotkeyBindingStore.conflictsWith(repository.getBindings(), shortcut);
     }
 
     private void addHotkey() {
