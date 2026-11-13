@@ -8,7 +8,7 @@ This document defines the strict architectural, performance, and code-style stan
 
 AltShift is a background hardware utility. It must operate like a native C/Rust daemon with the safety of modern Java 21.
 
-*   **Idle RAM:** $\le$ 25 MB resident memory.
+*   **Idle RAM:** $\le$ 64 MB total PSS in the attached typing or detached watchdog state, with Java + native heap allocation under 15 MB (Java heap ~2–4 MB). Active UI and app-picker memory is transient and must return to the idle budget after the activity exits.
 *   **Idle CPU:** Exactly 0.0% CPU when no keys are pressed. No background polling loops, no continuous timers.
 *   **Keystroke Latency:** $\le$ 1 ms dispatch time. Zero heap allocations during typing (`onKeyDown`).
 *   **UI Thread Guarantee:** 60/120 FPS without frame drops. No Binder IPC calls, synchronous disk I/O, or icon decoding on the main thread.
@@ -198,6 +198,11 @@ static final class KeyCaptureState {
 *   Dialog view bindings must be cleared or scoped strictly to dialog lifecycles.
 *   In `RecyclerView.ViewHolder`, bind views directly through generated binding references without `findViewById` traversal.
 
+### 5.4. Dynamic Island Overlay Conventions
+*   A floating `WindowManager` overlay must use a transparent outer `FrameLayout` with at least `16dp` padding, `android:clipToPadding="false"`, and `android:clipChildren="false"`.
+*   Put elevation and the subtle `1dp` `?attr/colorOutline` stroke on the inner `MaterialCardView` (`28dp` radius, `?attr/colorSurface`), never on the `WRAP_CONTENT` window root, so the shadow is never clipped into a rectangle.
+*   Keep `Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL`, account for the outer padding in the bottom offset, and let phones use the inset width while `sw600dp+` keeps the `420dp` minimum.
+
 ---
 
 ## 6. Modern Java 21 Language Idioms
@@ -334,6 +339,12 @@ try {
     Log.w(TAG, "Background foreground-service start was denied", exception);
 }
 ```
+
+### 8.5. Inactive-Keyboard Notification Convention
+*   The `KeyboardNotification` reminder uses the versioned `altshift_keyboard_alerts_v2` channel at `IMPORTANCE_DEFAULT`: it appears in the shade but never as a heads-up banner.
+*   Do not set `Notification.PRIORITY_HIGH` or `Notification.DEFAULT_ALL`; keep the reminder swipe-dismissible with `setAutoCancel(true)` and no `setOngoing(true)`.
+*   Post it only after the user closes or times out the Dynamic Island, or cancels the system picker. An explicit **Switch back** action and every programmatic dismissal must not post it.
+*   Cancel it when AltShift becomes the active IME or the physical keyboard detaches, so the reminder never outlives the condition it describes.
 
 ---
 
