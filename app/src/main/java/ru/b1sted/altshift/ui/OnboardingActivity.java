@@ -76,6 +76,11 @@ public final class OnboardingActivity extends AppCompatActivity {
     private int stateGeneration;
     private boolean notificationRequested;
     private boolean resumed;
+    private boolean imeEnabled;
+    private boolean imeActive;
+    private boolean alternativeAvailable;
+    private boolean stateResolved;
+    private boolean initialStepPending;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -110,13 +115,19 @@ public final class OnboardingActivity extends AppCompatActivity {
             }
         });
 
-        int initialStep = savedInstanceState == null
-                ? (rerun ? STEP_ENABLE : firstIncompleteStep())
-                : savedInstanceState.getInt(STATE_CURRENT_STEP, STEP_ENABLE);
         notificationRequested = savedInstanceState != null
                 && savedInstanceState.getBoolean(STATE_NOTIFICATION_REQUESTED, false);
 
-        showStep(initialStep);
+        if (savedInstanceState != null) {
+            showStep(savedInstanceState.getInt(STATE_CURRENT_STEP, STEP_ENABLE));
+        } else if (rerun) {
+            showStep(STEP_ENABLE);
+        } else {
+            // The first step needs Binder-backed IME state. Show the safe
+            // default now and let the background refresh select the real step.
+            initialStepPending = true;
+            showStep(STEP_ENABLE);
+        }
     }
 
     @Override
@@ -219,11 +230,11 @@ public final class OnboardingActivity extends AppCompatActivity {
     }
 
     private int firstIncompleteStep() {
-        if (!isImeEnabled() || !hasAlternativeKeyboard()) {
+        if (!imeEnabled || !alternativeAvailable) {
             return STEP_ENABLE;
         }
 
-        if (!isAltShiftActive()) {
+        if (!imeActive) {
             return STEP_SELECT;
         }
 
@@ -303,6 +314,21 @@ public final class OnboardingActivity extends AppCompatActivity {
         if (generation != stateGeneration || binding == null
                 || isFinishing() || isDestroyed()) {
             return;
+        }
+
+        this.imeEnabled = imeEnabled;
+        this.imeActive = imeActive;
+        this.alternativeAvailable = alternativeAvailable;
+        stateResolved = true;
+
+        if (initialStepPending) {
+            initialStepPending = false;
+            int resolvedStep = firstIncompleteStep();
+            if (resolvedStep != currentStep) {
+                showStep(resolvedStep);
+
+                return;
+            }
         }
 
         boolean overlayGranted = PermissionHelper.canDrawOverlays(this);
@@ -480,9 +506,15 @@ public final class OnboardingActivity extends AppCompatActivity {
     }
 
     private void handlePrimaryAction() {
+        if (!stateResolved) {
+            refreshState();
+
+            return;
+        }
+
         switch (currentStep) {
             case STEP_ENABLE -> {
-                if (!isImeEnabled() || !hasAlternativeKeyboard()) {
+                if (!imeEnabled || !alternativeAvailable) {
                     openImeSettings();
 
                     return;
@@ -491,13 +523,13 @@ public final class OnboardingActivity extends AppCompatActivity {
                 showStep(STEP_SELECT);
             }
             case STEP_SELECT -> {
-                if (!isImeEnabled() || !hasAlternativeKeyboard()) {
+                if (!imeEnabled || !alternativeAvailable) {
                     openImeSettings();
 
                     return;
                 }
 
-                if (isAltShiftActive()) {
+                if (imeActive) {
                     showStep(STEP_PERMISSIONS);
 
                     return;
@@ -533,18 +565,6 @@ public final class OnboardingActivity extends AppCompatActivity {
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
         finish();
-    }
-
-    private boolean isImeEnabled() {
-        return InputMethodSwitcher.isAltShiftEnabled(this);
-    }
-
-    private boolean isAltShiftActive() {
-        return InputMethodSwitcher.isAltShiftActive(this);
-    }
-
-    private boolean hasAlternativeKeyboard() {
-        return InputMethodSwitcher.hasAlternativeInputMethod(this);
     }
 
     private void requestNotificationPermission() {
