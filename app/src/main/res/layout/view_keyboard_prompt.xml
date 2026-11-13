@@ -6,9 +6,9 @@
     android:background="@android:color/transparent"
     android:clipChildren="false"
     android:clipToPadding="false"
-    android:paddingStart="24dp"
+    android:paddingStart="@dimen/prompt_outer_horizontal_padding"
     android:paddingTop="14dp"
-    android:paddingEnd="24dp"
+    android:paddingEnd="@dimen/prompt_outer_horizontal_padding"
     android:paddingBottom="28dp">
 
     <com.google.android.material.card.MaterialCardView
@@ -27,10 +27,10 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="20dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="12dp"
-            android:paddingBottom="10dp">
+            android:paddingStart="@dimen/prompt_card_padding_start"
+            android:paddingTop="@dimen/prompt_card_padding_vertical"
+            android:paddingEnd="@dimen/prompt_card_padding_end"
+            android:paddingBottom="@dimen/prompt_card_padding_vertical">
 
             <ImageView
                 android:id="@+id/promptIcon"
@@ -40,14 +40,16 @@
                 android:src="@drawable/ic_notification_keyboard"
                 app:tint="?attr/colorOnSurfaceVariant" />
 
+            <!-- Allow two lines on a 360dp phone instead of an ellipsis. The
+                 weighted width lets the label absorb the space that remains
+                 after the pinned action and close buttons. -->
             <TextView
                 android:id="@+id/promptText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="@dimen/prompt_icon_text_gap"
                 android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
+                android:maxLines="2"
                 android:text="@string/prompt_keyboard_reconnected"
                 android:textAppearance="?attr/textAppearanceTitleSmall"
                 android:textColor="?attr/colorOnSurface" />
@@ -56,14 +58,15 @@
                 android:id="@+id/promptAction"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="@dimen/prompt_action_gap"
                 android:background="@drawable/bg_prompt_action"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
+                android:maxLines="1"
                 android:minHeight="40dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
+                android:paddingStart="@dimen/prompt_action_horizontal_padding"
+                android:paddingEnd="@dimen/prompt_action_horizontal_padding"
                 android:text="@string/notification_switch_back"
                 android:textAppearance="?attr/textAppearanceLabelLarge"
                 android:textColor="?attr/colorOnPrimary" />
@@ -72,7 +75,7 @@
                 android:id="@+id/promptClose"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="@dimen/prompt_close_gap"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/prompt_dismiss"
                 android:padding="8dp"

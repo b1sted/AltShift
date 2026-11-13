@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AltShift</string>
-    <string name="ime_name">AltShift</string>
+    <string name="app_name" translatable="false">AltShift</string>
+    <string name="ime_name" translatable="false">AltShift</string>
     <string name="ime_subtype_label">AltShift hardware keyboard</string>
 
     <string name="onboarding_step_label">Step %1$d</string>
@@ -57,6 +57,11 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
 
+    <string name="language_app_title">App language</string>
+    <string name="language_app_system">System default</string>
+    <string name="language_app_english" translatable="false">English</string>
+    <string name="language_app_russian" translatable="false">Русский</string>
+
     <string name="auto_switch_title">Seamless Hardware Switching (Optional)</string>
     <string name="auto_switch_description">AltShift can switch keyboards for you the moment your keyboard connects or disconnects.</string>
     <string name="auto_switch_status_active">Active</string>
@@ -74,7 +79,7 @@
     <string name="adb_step_three_body">Run this command in your computer\'s terminal:</string>
     <string name="adb_copy_command_action">Copy Command</string>
     <string name="adb_no_computer_notice">No computer? No problem! Without this permission, AltShift works normally and will simply show a convenient tap-to-switch bubble when your keyboard connects.</string>
-    <string name="auto_switch_command">adb shell pm grant ru.b1sted.altshift android.permission.WRITE_SECURE_SETTINGS</string>
+    <string name="auto_switch_command" translatable="false">adb shell pm grant ru.b1sted.altshift android.permission.WRITE_SECURE_SETTINGS</string>
     <string name="auto_switch_command_label">AltShift ADB command</string>
     <string name="auto_switch_permission_required">Grant WRITE_SECURE_SETTINGS over ADB to enable auto-switching.</string>
     <string name="command_copied">Command copied to clipboard.</string>
@@ -138,7 +143,7 @@
 
     <string name="about_title">About AltShift</string>
     <string name="about_icon">AltShift icon</string>
-    <string name="about_version_format">v%1$s (versionCode = %2$d)</string>
+    <string name="about_version_format" translatable="false">v%1$s (versionCode = %2$d)</string>
     <string name="about_license">GNU General Public License v3.0</string>
     <string name="about_author">by Nikita Mandrykin (b1sted)</string>
     <string name="about_repository_action">GitHub Repository</string>
@@ -153,7 +158,7 @@
     <string name="about_auto_switch_label">Auto-switch mode</string>
     <string name="about_keyboard_none">None connected</string>
     <string name="about_hardware_ids_unknown">N/A</string>
-    <string name="about_hardware_ids_format">VID: 0x%1$04x, PID: 0x%2$04x</string>
+    <string name="about_hardware_ids_format" translatable="false">VID: 0x%1$04x, PID: 0x%2$04x</string>
     <string name="about_auto_switch_autonomous">Autonomous (WRITE_SECURE_SETTINGS)</string>
     <string name="about_auto_switch_interactive">Interactive (Dynamic Island)</string>
     <string name="about_value_loading">Reading…</string>

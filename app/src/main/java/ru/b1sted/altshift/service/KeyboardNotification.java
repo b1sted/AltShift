@@ -9,6 +9,7 @@ import android.graphics.drawable.Icon;
 import android.util.Log;
 
 import ru.b1sted.altshift.R;
+import ru.b1sted.altshift.ui.LocaleController;
 import ru.b1sted.altshift.ui.SwitchBackActivity;
 import ru.b1sted.altshift.util.PermissionHelper;
 
@@ -65,6 +66,9 @@ public final class KeyboardNotification {
             Intent intent = new Intent(context, SwitchBackActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
 
+            Context localized = LocaleController.localizedContext(context);
+            String title = localized.getString(R.string.notification_inactive_title);
+            String body = localized.getString(R.string.notification_inactive_text);
             PendingIntent pendingIntent = PendingIntent.getActivity(
                     context,
                     REQUEST_CODE,
@@ -72,19 +76,18 @@ public final class KeyboardNotification {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
             Notification.Builder builder =
-                    new Notification.Builder(context, channelId);
+                    new Notification.Builder(localized, channelId);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
-                    .setContentTitle(context.getString(
-                            R.string.notification_inactive_title))
-                    .setContentText(context.getString(
-                            R.string.notification_inactive_text))
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setStyle(new Notification.BigTextStyle().bigText(body))
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true)
                     .setShowWhen(false)
                     .setCategory(Notification.CATEGORY_STATUS)
                     .addAction(new Notification.Action.Builder(
-                            Icon.createWithResource(context, R.drawable.ic_notification_keyboard),
-                            context.getString(R.string.notification_switch_back),
+                            Icon.createWithResource(localized, R.drawable.ic_notification_keyboard),
+                            localized.getString(R.string.notification_switch_back),
                             pendingIntent).build());
 
             if (headsUp) {

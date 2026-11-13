@@ -13,10 +13,12 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.TextView;
 
 import java.lang.ref.WeakReference;
 import java.util.Objects;
@@ -27,6 +29,7 @@ import ru.b1sted.altshift.model.HotkeyBinding;
 import ru.b1sted.altshift.model.LanguageSwitchShortcut;
 import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.ui.SwitchBackActivity;
+import ru.b1sted.altshift.ui.ThemeController;
 
 public final class HardwareInputService extends InputMethodService {
 
@@ -90,7 +93,22 @@ public final class HardwareInputService extends InputMethodService {
 
     @Override
     public View onCreateInputView() {
-        fallbackBinding = ViewImeFallbackBinding.inflate(getLayoutInflater());
+        // The IME runs under Theme.DeviceDefault.InputMethod, which lacks the
+        // Material 3 attributes used by view_ime_fallback.xml. Inflate through
+        // the shared locale + night-mode context instead.
+        Context themed = ThemeController.themedContext(this);
+        Context inflationContext = themed != null ? themed : this;
+
+        try {
+            fallbackBinding = ViewImeFallbackBinding.inflate(
+                    LayoutInflater.from(inflationContext));
+        } catch (RuntimeException exception) {
+            Log.e(TAG, "Unable to inflate the IME fallback view", exception);
+            fallbackBinding = null;
+
+            return createEmergencyFallbackView(inflationContext);
+        }
+
         fallbackBinding.switchKeyboardButton.setOnClickListener(
                 view -> requestSoftKeyboardSwitch());
         fallbackBinding.openKeyboardSettingsButton.setOnClickListener(
@@ -99,6 +117,21 @@ public final class HardwareInputService extends InputMethodService {
         applyFallbackState();
 
         return fallbackBinding.getRoot();
+    }
+
+    /**
+     * Keeps the system input framework alive if a future platform change makes
+     * the Material fallback layout impossible to inflate.
+     */
+    private View createEmergencyFallbackView(Context context) {
+        TextView message = new TextView(context);
+        message.setText(context.getString(R.string.ime_fallback_message));
+
+        int padding = Math.round(
+                16 * context.getResources().getDisplayMetrics().density);
+        message.setPadding(padding, padding, padding, padding);
+
+        return message;
     }
 
     @Override
@@ -259,9 +292,10 @@ public final class HardwareInputService extends InputMethodService {
 
         boolean stranded = !keyboardPresent && !alternativeImeAvailable;
 
-        local.fallbackMessage.setText(stranded
+        Context viewContext = local.getRoot().getContext();
+        local.fallbackMessage.setText(viewContext.getString(stranded
                 ? R.string.ime_fallback_no_keyboard_message
-                : R.string.ime_fallback_message);
+                : R.string.ime_fallback_message));
         local.switchKeyboardButton.setVisibility(stranded ? View.GONE : View.VISIBLE);
         local.openKeyboardSettingsButton.setVisibility(
                 stranded ? View.VISIBLE : View.GONE);

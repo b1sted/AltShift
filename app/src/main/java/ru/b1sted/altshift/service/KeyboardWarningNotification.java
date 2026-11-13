@@ -7,9 +7,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Icon;
 import android.provider.Settings;
+import android.service.notification.StatusBarNotification;
 import android.util.Log;
 
 import ru.b1sted.altshift.R;
+import ru.b1sted.altshift.ui.LocaleController;
 import ru.b1sted.altshift.util.PermissionHelper;
 
 /**
@@ -54,14 +56,16 @@ public final class KeyboardWarningNotification {
                 return false;
             }
 
+            Context localized = LocaleController.localizedContext(context);
+            String title = localized.getString(R.string.notification_no_keyboard_title);
+            String body = localized.getString(R.string.notification_no_keyboard_text);
             PendingIntent pendingIntent = createSettingsIntent(context);
             Notification.Builder builder =
-                    new Notification.Builder(context, NotificationChannels.SAFETY_WARNINGS);
+                    new Notification.Builder(localized, NotificationChannels.SAFETY_WARNINGS);
             builder.setSmallIcon(R.drawable.ic_notification_keyboard)
-                    .setContentTitle(context.getString(
-                            R.string.notification_no_keyboard_title))
-                    .setContentText(context.getString(
-                            R.string.notification_no_keyboard_text))
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setStyle(new Notification.BigTextStyle().bigText(body))
                     .setContentIntent(pendingIntent)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
@@ -70,8 +74,8 @@ public final class KeyboardWarningNotification {
                     .setPriority(Notification.PRIORITY_HIGH)
                     .setDefaults(Notification.DEFAULT_ALL)
                     .addAction(new Notification.Action.Builder(
-                            Icon.createWithResource(context, R.drawable.ic_notification_keyboard),
-                            context.getString(R.string.notification_keyboard_settings),
+                            Icon.createWithResource(localized, R.drawable.ic_notification_keyboard),
+                            localized.getString(R.string.notification_keyboard_settings),
                             pendingIntent).build());
 
             manager.notify(NOTIFICATION_ID, builder.build());
@@ -81,6 +85,36 @@ public final class KeyboardWarningNotification {
             Log.w(TAG, "Unable to post the single-keyboard warning", exception);
 
             return false;
+        }
+    }
+
+    /**
+     * Reposts the warning with the current locale when it is still visible.
+     * Cancelling and re-posting is unnecessary because the notification ID is
+     * stable and {@code setOnlyAlertOnce(true)} keeps the refresh silent.
+     */
+    public static void refreshIfPosted(Context context) {
+        if (context == null) {
+            return;
+        }
+
+        try {
+            NotificationManager manager =
+                    (NotificationManager) context.getSystemService(
+                            Context.NOTIFICATION_SERVICE);
+            if (manager == null) {
+                return;
+            }
+
+            for (StatusBarNotification active : manager.getActiveNotifications()) {
+                if (active.getId() == NOTIFICATION_ID) {
+                    show(context);
+
+                    return;
+                }
+            }
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "Unable to refresh the single-keyboard warning", exception);
         }
     }
 
