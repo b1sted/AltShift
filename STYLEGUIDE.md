@@ -8,7 +8,7 @@ This document defines the strict architectural, performance, and code-style stan
 
 AltShift is a background hardware utility. It must operate like a native C/Rust daemon with the safety of modern Java 21.
 
-*   **Idle RAM:** $\le$ 64 MB total PSS in the attached typing or detached watchdog state, with Java + native heap allocation under 15 MB (Java heap ~2–4 MB). Active UI and app-picker memory is transient and must return to the idle budget after the activity exits.
+*   **Idle RAM:** $\le$ 64 MB total PSS in the attached typing or standby watchdog state, with Java + native heap allocation under 15 MB (Java heap ~2–4 MB). Active UI and app-picker memory is transient and must return to the idle budget after the activity exits.
 *   **Idle CPU:** Exactly 0.0% CPU when no keys are pressed. No background polling loops, no continuous timers.
 *   **Keystroke Latency:** $\le$ 1 ms dispatch time. Zero heap allocations during typing (`onKeyDown`).
 *   **UI Thread Guarantee:** 60/120 FPS without frame drops. No Binder IPC calls, synchronous disk I/O, or icon decoding on the main thread.
@@ -305,27 +305,29 @@ private boolean tryStartActivity(Intent intent) {
 
 AltShift owns no `Activity` while the user types in another application. Once the platform unbinds `HardwareInputService`, `ru.b1sted.altshift` becomes a cached process. On Android 12+ the Cached Apps Freezer may then set `isFrozen=true` and `oom_adj=900` (`cch LAST`), even when battery optimization is disabled for the app.
 
-*   **Frozen processes miss input callbacks.** A frozen process receives no `InputManager.InputDeviceListener` Binder callbacks. A pogo-pin or external keyboard can reconnect while the process is frozen, leaving the device stuck on the soft keyboard with no way for AltShift to react.
-*   **The watchdog is a temporary thaw, not a permanent daemon.** `KeyboardWatchdogService` exists solely to keep the process unfrozen while a physical keyboard is detached and reconnect monitoring is active. It is not a background keep-alive for the whole application.
+*   **Frozen processes miss input callbacks.** A frozen process receives no `InputManager.InputDeviceListener` Binder callbacks. A pogo-pin or external keyboard can reconnect while the process is frozen, leaving the device stuck on the soft keyboard with no way for AltShift to react. In the same way, a disconnect callback never runs, so a stale "AltShift is inactive" notification stays in the shade.
+*   **The watchdog is a temporary thaw, not a permanent daemon.** `KeyboardWatchdogService` exists solely to keep the process unfrozen while AltShift is enabled but another IME is selected and at least one reconnect or alert path is usable. It is not a background keep-alive for the whole application.
 
 ### 8.1. When `KeyboardWatchdogService` May Run
 Start the watchdog only when **all** of the following are true:
 1. Onboarding is completed.
-2. No physical keyboard is currently attached.
-3. AltShift is enabled in the system IME settings but is **not** the active IME.
-4. At least one reconnect mechanism is usable: `autoSwitchEnabled` with `WRITE_SECURE_SETTINGS`, or the `SYSTEM_ALERT_WINDOW` overlay permission.
+2. AltShift is enabled in the system IME settings but is **not** the active IME.
+3. At least one reconnect or alert mechanism is usable: `autoSwitchEnabled` with `WRITE_SECURE_SETTINGS`, the `SYSTEM_ALERT_WINDOW` overlay permission, or `KeyboardNotification.canPost()`.
+
+Physical keyboard attachment is **not** a start condition. The watchdog runs in both states so it can see the reconnect and disconnect callbacks: while detached it waits for a keyboard, and while attached (with another IME selected) it stays ready to cancel stale alerts and show the Dynamic Island again. The keyboard state only selects the foreground notification text.
 
 ### 8.2. Mandatory Shutdown Rules
-*   Call `stopSelf()` (or `KeyboardWatchdogService.stop()`) immediately when a physical keyboard is attached. **Zero foreground-service notifications may remain while a keyboard is attached.**
-*   Stop when AltShift becomes the active IME, because the live `InputMethodService` binding already keeps the process unfrozen.
-*   Stop when onboarding is reset, AltShift is disabled, or no reconnect mechanism remains available.
+*   Call `stopSelf()` (or `KeyboardWatchdogService.stop()`) immediately when AltShift becomes the active IME. The live `InputMethodService` binding already keeps the process unfrozen during normal typing, so no foreground-service notification may remain.
+*   Stop when onboarding is reset, AltShift is disabled, or no reconnect/alert mechanism remains available.
 *   Reconcile the watchdog from the existing process-wide monitor whenever the keyboard state or input-method settings change; never rely on a polling loop.
+*   While the service is already running, update the posted notification only when the keyboard state actually changed. Do not call `startForegroundService()` again for an unchanged state; use `NotificationManager.notify()` with the resolved text.
 
 ### 8.3. Android 14 Foreground Service Declaration
 *   Declare `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE` in `AndroidManifest.xml`.
 *   Use `android:foregroundServiceType="specialUse"` with the `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE` property. Do **not** use `connectedDevice`: it requires Bluetooth, USB, or Wi-Fi permissions that AltShift intentionally avoids.
 *   On API 34+, call `startForeground(id, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)`; older releases use the two-argument overload.
 *   Use the `NotificationChannels.KEYBOARD_WATCHDOG` channel (`IMPORTANCE_MIN`, no vibration, no sound, no badge), keep the notification ongoing, and set `FOREGROUND_SERVICE_IMMEDIATE` on API 31+. Silence comes from the channel, so the framework `Notification.Builder` stays compatible with `minSdk 26`.
+*   Keep the notification truthful across both keyboard states: "Waiting for physical keyboard" while detached, and "Monitoring keyboard connection" while a keyboard is attached but another IME remains selected. Both variants stay ongoing and silent.
 
 ### 8.4. Defensive Foreground-Service Starts
 Every `startForegroundService()` and `startForeground()` call must be wrapped in `try-catch`. The platform may reject a background start with `ForegroundServiceStartNotAllowedException` (API 31+, a `RuntimeException`) or with a `SecurityException` when the FGS type or permission is unavailable. Log the rejection and continue; a denied watchdog must never crash the IME or the boot receiver.
@@ -348,6 +350,7 @@ try {
 *   **Heads-up reminder:** `KeyboardNotification.showInactiveHeadsUp()` uses `altshift_keyboard_alerts_urgent` (`NotificationChannels.KEYBOARD_ALERTS_URGENT`, `IMPORTANCE_HIGH`, vibration enabled) with `Notification.PRIORITY_HIGH` and `Notification.DEFAULT_ALL`. Omit `setOnlyAlertOnce(true)` so a repeated picker cancellation reliably pops up again. Keep it swipe-dismissible with `setAutoCancel(true)` and no `setOngoing(true)`.
 *   Post the standard reminder only after the user closes (`[X]`) or times out (12 s) the Dynamic Island, from `BootReceiver` and `HardwareInputService`. Post the heads-up reminder only from `SwitchBackActivity.onPickerDismissed()` when `!InputMethodSwitcher.isAltShiftActive()`. An explicit **Switch back** action and every programmatic dismissal must not post the standard reminder.
 *   Cancel the shared notification when AltShift becomes the active IME or the physical keyboard detaches, so no reminder outlives the condition it describes.
+*   The keyboard monitor owns the disconnect cleanup: `applyKeyboardDetached()` cancels the shared notification and reconciles the watchdog with `present = false`. `applyKeyboardAttached()` stops the watchdog only when AltShift became active; otherwise it reconciles with `present = true` so the quiet monitoring status and the next Dynamic Island prompt remain reliable.
 
 ---
 
@@ -364,5 +367,5 @@ Before committing any Java file, verify each checkpoint:
 - [ ] **No One-Element Arrays:** Are dialogs free of `int[]` and `boolean[]` closure workarounds?
 - [ ] **Async UI:** Are package queries and app icons loaded off the main thread?
 - [ ] **Fail-Safe IME:** Are all `startActivity` and `InputConnection` interactions wrapped in defensive exception guards?
-- [ ] **Watchdog Scope:** Does `KeyboardWatchdogService` stop immediately once a physical keyboard is attached, leaving no FGS notification behind?
+- [ ] **Watchdog Scope:** Does `KeyboardWatchdogService` run only while AltShift is inactive with a usable reconnect/alert path, stop immediately once AltShift becomes the active IME, and update its notification only when the keyboard state changes?
 - [ ] **Guarded FGS Starts:** Are all `startForegroundService` and `startForeground` calls wrapped against `ForegroundServiceStartNotAllowedException` / `SecurityException` / `RuntimeException`?
