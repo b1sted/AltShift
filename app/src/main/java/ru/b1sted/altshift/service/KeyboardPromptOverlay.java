@@ -18,7 +18,6 @@ import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
-import android.widget.LinearLayout;
 
 import androidx.annotation.RequiresApi;
 
@@ -155,7 +154,6 @@ public final class KeyboardPromptOverlay {
         }
 
         configureCardWidth(inflated);
-        releaseTextWeightOnTablets(inflated);
         applyThemeTint(inflated);
         inflated.promptAction.setOnClickListener(view -> runSwitchAction());
         inflated.promptClose.setOnClickListener(view -> dismissByUser());
@@ -231,36 +229,19 @@ public final class KeyboardPromptOverlay {
     /**
      * The phone window has a fixed inset width, so the card must fill the padded
      * content area for the weighted message to shrink correctly. The tablet
-     * window wraps the card and keeps its 420dp minimum.
+     * capsule gets an exact 420dp width so the weighted message absorbs the
+     * remaining space and pins the action and close buttons to the right edge.
      */
     private void configureCardWidth(ViewKeyboardPromptBinding inflated) {
-        if (!isCompactWidth()) {
-            return;
-        }
-
         ViewGroup.LayoutParams params = inflated.promptCard.getLayoutParams();
-        params.width = ViewGroup.LayoutParams.MATCH_PARENT;
-        inflated.promptCard.setLayoutParams(params);
-    }
 
-    /**
-     * The phone layout lets the message take the remaining width and ellipsize.
-     * A tablet capsule keeps its 420dp minimum and lets the message wrap to its
-     * natural size instead of stretching the pill across the whole screen.
-     */
-    private void releaseTextWeightOnTablets(ViewKeyboardPromptBinding inflated) {
         if (isCompactWidth()) {
-            return;
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+        } else {
+            params.width = context.getResources().getDimensionPixelSize(R.dimen.prompt_min_width);
         }
 
-        ViewGroup.LayoutParams params = inflated.promptText.getLayoutParams();
-        if (!(params instanceof LinearLayout.LayoutParams textParams)) {
-            return;
-        }
-
-        textParams.width = ViewGroup.LayoutParams.WRAP_CONTENT;
-        textParams.weight = 0f;
-        inflated.promptText.setLayoutParams(textParams);
+        inflated.promptCard.setLayoutParams(params);
     }
 
     private boolean isCompactWidth() {
@@ -402,8 +383,8 @@ public final class KeyboardPromptOverlay {
 
     /**
      * Phones get an explicit inset width so the message can shrink and
-     * ellipsize instead of pushing the action button off-screen. Tablets keep
-     * the natural capsule width controlled by the 420dp minimum.
+     * ellipsize instead of pushing the action button off-screen. Tablets wrap
+     * the card, which carries an exact 420dp width set after inflation.
      */
     private int promptWidth() {
         if (!isCompactWidth()) {
