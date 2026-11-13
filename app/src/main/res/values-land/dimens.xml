@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Height-constrained landscape views keep the onboarding content above
+         the fold instead of pushing the action buttons and step dots away. -->
+    <dimen name="onboarding_content_top_padding">16dp</dimen>
+    <dimen name="onboarding_content_bottom_padding">16dp</dimen>
+    <dimen name="onboarding_icon_size">72dp</dimen>
+    <dimen name="onboarding_step_label_margin">16dp</dimen>
+    <dimen name="onboarding_card_margin">12dp</dimen>
+    <dimen name="onboarding_action_margin">16dp</dimen>
+    <dimen name="onboarding_dots_bottom_padding">12dp</dimen>
+    <dimen name="dialog_content_padding">16dp</dimen>
+    <dimen name="key_capture_text_padding">12dp</dimen>
+    <dimen name="key_capture_instruction_margin">8dp</dimen>
+    <dimen name="key_capture_hint_margin">8dp</dimen>
+</resources>

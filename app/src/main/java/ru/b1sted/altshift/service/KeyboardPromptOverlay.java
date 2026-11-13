@@ -39,7 +39,7 @@ public final class KeyboardPromptOverlay {
     private static final long AUTO_DISMISS_MS = 12000L;
     private static final int FALLBACK_BOTTOM_PADDING_DP = 16;
     private static final int BOTTOM_OFFSET_DP = 20;
-    private static final int PROMPT_HORIZONTAL_MARGIN_DP = 8;
+    private static final int PROMPT_HORIZONTAL_MARGIN_DP = 4;
     private static final int TABLET_MIN_WIDTH_DP = 600;
     private static final Object LOCK = new Object();
 
@@ -230,9 +230,9 @@ public final class KeyboardPromptOverlay {
 
     /**
      * The phone window has a fixed inset width, so the card must fill the padded
-     * content area for the weighted message to shrink correctly. The tablet
-     * capsule gets an exact 420dp width so the weighted message absorbs the
-     * remaining space and pins the action and close buttons to the right edge.
+     * content area for the weighted message to absorb the remaining space. The
+     * tablet capsule gets an exact 420dp width so the message stays on a single
+     * line and pins the action and close buttons to the right edge.
      */
     private void configureCardWidth(ViewKeyboardPromptBinding inflated) {
         ViewGroup.LayoutParams params = inflated.promptCard.getLayoutParams();
@@ -384,9 +384,12 @@ public final class KeyboardPromptOverlay {
     }
 
     /**
-     * Phones get an explicit inset width so the message can shrink and
-     * ellipsize instead of pushing the action button off-screen. Tablets wrap
-     * the card, which carries an exact 420dp width set after inflation.
+     * Phones get an explicit inset width so the card keeps a clean 16dp screen
+     * edge (4dp window margin plus 12dp outer shadow padding). The message can
+     * then wrap to two lines instead of pushing the action button off-screen.
+     * The width is capped so a landscape phone does not stretch the capsule
+     * across the whole display. Tablets wrap the card, which carries an exact
+     * 420dp width after inflation.
      */
     private int promptWidth() {
         if (!isCompactWidth()) {
@@ -394,7 +397,9 @@ public final class KeyboardPromptOverlay {
         }
 
         int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
-        int availableWidth = screenWidth - dp(PROMPT_HORIZONTAL_MARGIN_DP) * 2;
+        int maxWidth = context.getResources().getDimensionPixelSize(R.dimen.prompt_max_width);
+        int availableWidth = Math.min(
+                screenWidth - dp(PROMPT_HORIZONTAL_MARGIN_DP) * 2, maxWidth);
 
         return availableWidth > 0
                 ? availableWidth

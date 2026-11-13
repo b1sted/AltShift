@@ -75,6 +75,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:minHeight="48dp"
             android:text="@string/about_repository_action" />
 
         <com.google.android.material.button.MaterialButton
@@ -83,6 +86,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:minHeight="48dp"
             android:text="@string/about_rerun_wizard_action" />
 
         <com.google.android.material.card.MaterialCardView

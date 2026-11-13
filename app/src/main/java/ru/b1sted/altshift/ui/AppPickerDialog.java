@@ -47,6 +47,14 @@ public final class AppPickerDialog {
 
     private static final long LIST_FADE_DURATION_MS = 150L;
 
+    /**
+     * The picker list takes at most half of the current screen height so the
+     * dialog title and the Cancel button always stay on-screen on short
+     * landscape phones.
+     */
+    private static final float LIST_HEIGHT_FRACTION = 0.5f;
+    private static final int LIST_MIN_HEIGHT_DP = 160;
+
     public interface Listener {
         void onSelected(String appName, String packageName);
     }
@@ -64,6 +72,7 @@ public final class AppPickerDialog {
 
         DialogAppPickerBinding binding =
                 DialogAppPickerBinding.inflate(LayoutInflater.from(context));
+        applyAdaptiveHeight(context, binding);
         AlertDialog dialog = new MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.select_app_title)
                 .setView(binding.getRoot())
@@ -78,6 +87,21 @@ public final class AppPickerDialog {
         PickerSession session = new PickerSession(
                 context.getApplicationContext(), dialog, binding, adapter);
         session.show();
+    }
+
+    private static void applyAdaptiveHeight(
+            Context context, DialogAppPickerBinding binding) {
+        int maxHeight = context.getResources()
+                .getDimensionPixelSize(R.dimen.app_picker_max_height);
+        int screenHeight = context.getResources()
+                .getDisplayMetrics().heightPixels;
+        int minHeight = Math.round(LIST_MIN_HEIGHT_DP
+                * context.getResources().getDisplayMetrics().density);
+        int preferredHeight = Math.round(screenHeight * LIST_HEIGHT_FRACTION);
+        int height = Math.min(maxHeight, Math.max(minHeight, preferredHeight));
+
+        binding.getRoot().setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, height));
     }
 
     /**

@@ -2,5 +2,12 @@
 <resources>
     <dimen name="onboarding_content_side_margin">48dp</dimen>
     <dimen name="prompt_min_width">420dp</dimen>
-    <dimen name="status_badge_text_max_width">340dp</dimen>
+    <dimen name="prompt_outer_horizontal_padding">16dp</dimen>
+    <dimen name="prompt_card_padding_start">20dp</dimen>
+    <dimen name="prompt_card_padding_end">12dp</dimen>
+    <dimen name="prompt_icon_text_gap">12dp</dimen>
+    <dimen name="prompt_action_gap">12dp</dimen>
+    <dimen name="prompt_action_horizontal_padding">16dp</dimen>
+    <dimen name="prompt_close_gap">4dp</dimen>
+    <dimen name="app_picker_max_height">420dp</dimen>
 </resources>
