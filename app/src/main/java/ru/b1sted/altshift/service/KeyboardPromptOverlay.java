@@ -2,6 +2,8 @@ package ru.b1sted.altshift.service;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
 import android.os.Build;
@@ -20,8 +22,12 @@ import android.widget.LinearLayout;
 
 import androidx.annotation.RequiresApi;
 
+import com.google.android.material.color.MaterialColors;
+
 import ru.b1sted.altshift.R;
 import ru.b1sted.altshift.databinding.ViewKeyboardPromptBinding;
+import ru.b1sted.altshift.model.ThemeMode;
+import ru.b1sted.altshift.storage.HotkeyRepository;
 import ru.b1sted.altshift.util.PermissionHelper;
 
 /**
@@ -32,8 +38,8 @@ public final class KeyboardPromptOverlay {
     private static final String TAG = "AltShift";
     private static final long AUTO_DISMISS_MS = 12000L;
     private static final int FALLBACK_BOTTOM_PADDING_DP = 16;
-    private static final int BOTTOM_OFFSET_DP = 8;
-    private static final int PROMPT_HORIZONTAL_MARGIN_DP = 16;
+    private static final int BOTTOM_OFFSET_DP = 20;
+    private static final int PROMPT_HORIZONTAL_MARGIN_DP = 8;
     private static final int TABLET_MIN_WIDTH_DP = 600;
     private static final Object LOCK = new Object();
 
@@ -140,10 +146,8 @@ public final class KeyboardPromptOverlay {
 
         ViewKeyboardPromptBinding inflated;
         try {
-            ContextThemeWrapper themedContext =
-                    new ContextThemeWrapper(context, R.style.Theme_AltShift);
             inflated = ViewKeyboardPromptBinding.inflate(
-                    LayoutInflater.from(themedContext));
+                    LayoutInflater.from(themedContext()));
         } catch (RuntimeException exception) {
             Log.w(TAG, "Unable to inflate the keyboard prompt overlay", exception);
 
@@ -152,6 +156,7 @@ public final class KeyboardPromptOverlay {
 
         configureCardWidth(inflated);
         releaseTextWeightOnTablets(inflated);
+        applyThemeTint(inflated);
         inflated.promptAction.setOnClickListener(view -> runSwitchAction());
         inflated.promptClose.setOnClickListener(view -> dismissByUser());
 
@@ -175,6 +180,52 @@ public final class KeyboardPromptOverlay {
         Log.d(TAG, "Keyboard prompt overlay shown");
 
         return true;
+    }
+
+    /**
+     * The overlay lives outside any Activity, so the persisted theme must be
+     * applied to the inflation context explicitly. The application context on
+     * its own follows only the OS night mode and would ignore an in-app
+     * Light/Dark choice.
+     */
+    private Context themedContext() {
+        ThemeMode mode = HotkeyRepository.getInstance(context).getThemeMode();
+        if (mode == ThemeMode.FOLLOW_SYSTEM) {
+            return new ContextThemeWrapper(context, R.style.Theme_AltShift);
+        }
+
+        Configuration configuration = new Configuration(
+                context.getResources().getConfiguration());
+        configuration.uiMode = (configuration.uiMode & ~Configuration.UI_MODE_NIGHT_MASK)
+                | nightMode(mode);
+
+        return new ContextThemeWrapper(
+                context.createConfigurationContext(configuration),
+                R.style.Theme_AltShift);
+    }
+
+    private int nightMode(ThemeMode mode) {
+        return switch (mode) {
+            case LIGHT -> Configuration.UI_MODE_NIGHT_NO;
+            case DARK -> Configuration.UI_MODE_NIGHT_YES;
+            default -> Configuration.UI_MODE_NIGHT_UNDEFINED;
+        };
+    }
+
+    /**
+     * The overlay is inflated with a plain themed inflater rather than an
+     * AppCompat activity, so the XML app:tint attribute is not applied by the
+     * framework factory. Resolve the same theme color explicitly or the white
+     * vector source would stay invisible on the light capsule.
+     */
+    private void applyThemeTint(ViewKeyboardPromptBinding inflated) {
+        int color = MaterialColors.getColor(
+                inflated.getRoot(),
+                com.google.android.material.R.attr.colorOnSurfaceVariant);
+        ColorStateList tint = ColorStateList.valueOf(color);
+
+        inflated.promptIcon.setImageTintList(tint);
+        inflated.promptClose.setImageTintList(tint);
     }
 
     /**
@@ -340,7 +391,10 @@ public final class KeyboardPromptOverlay {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-        params.y = bottomInset() + dp(BOTTOM_OFFSET_DP);
+        // The frame keeps 28dp of bottom padding for the shadow, so the window
+        // may overlap the system inset by 20dp; the visible card then sits 8dp
+        // above the navigation bar or gesture area.
+        params.y = Math.max(0, bottomInset() - dp(BOTTOM_OFFSET_DP));
         params.windowAnimations = R.style.Animation_AltShift_Prompt;
 
         return params;

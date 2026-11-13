@@ -6,17 +6,20 @@
     android:background="@android:color/transparent"
     android:clipChildren="false"
     android:clipToPadding="false"
-    android:padding="16dp">
+    android:paddingStart="24dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="28dp">
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/promptCard"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:minWidth="@dimen/prompt_min_width"
-        app:cardBackgroundColor="?attr/colorSurface"
+        app:cardBackgroundColor="@color/prompt_surface"
         app:cardCornerRadius="28dp"
-        app:cardElevation="8dp"
-        app:strokeColor="?attr/colorOutline"
+        app:cardElevation="4dp"
+        app:strokeColor="@color/prompt_stroke"
         app:strokeWidth="1dp">
 
         <LinearLayout
