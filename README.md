@@ -220,6 +220,8 @@ The reconnect watchdog has no user setting. It is reconciled automatically from 
 
 The fullscreen onboarding wizard reports whether AltShift is enabled and selected, requests notification permission on Android 13+, provides a one-tap overlay permission action, and requests a battery optimization exemption so the service survives Doze mode. The dashboard shows a toolbar status badge, the language shortcut card, the auto-switch toggle, and the app hotkey list. App shortcuts are stored per package and can be removed from the list.
 
+On some manufacturer ROMs, the Doze exemption alone is not enough for post-reboot startup: Lenovo ZUI, Xiaomi HyperOS, and ColorOS can block `BOOT_COMPLETED` until **Auto-start** is enabled for AltShift in the system app settings. Enable that vendor toggle once to let monitoring resume automatically after a reboot. AltShift itself stays 100% AOSP with no vendor-specific branches; this is a user-side OEM control, not an app permission.
+
 Configuration data lives in the app's private `SharedPreferences` file (`altshift_prefs`). Uninstalling the application removes it.
 
 ## License
